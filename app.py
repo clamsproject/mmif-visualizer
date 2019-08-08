@@ -1,5 +1,7 @@
 import os
 
+from clams import Mmif
+from clams.vocab import MediaTypes
 from flask import Flask, request, render_template, flash, redirect, url_for
 import requests
 from werkzeug.utils import secure_filename
@@ -9,12 +11,14 @@ app = Flask(__name__)
 @app.route('/display')
 def display_file():
     file = request.get_data()
-    return render_template('player_page.html', mmif=file)
+    return render_template('player_page.html', mmif=file, media=None) #todo get media
 
 def upload_display(filename):
     with open("temp/" + filename) as f:
         file = f.read()
-    return render_template('player_page.html', mmif=file)
+        mmif = Mmif(file)
+        media_fname = 'static'+mmif.get_medium_location(md_type=MediaTypes.V)
+    return render_template('player_page.html', mmif=file, media=media_fname)
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
