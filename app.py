@@ -8,17 +8,27 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
+
+def display_mmif(mmif_str):
+    mmif = Mmif(mmif_str)
+    # TODO (krim @ 9/28/19): catch error when no video file specified in the mmif
+    # TODO (krim @ 9/28/19): implement this to flexible to any media type (in order of v->a->t)
+    media_fname = 'static' + mmif.get_medium_location(md_type=MediaTypes.V)
+    return render_template('player_page.html', mmif=mmif, media=media_fname)
+
+
 @app.route('/display')
 def display_file():
-    file = request.get_data()
-    return render_template('player_page.html', mmif=file, media=None) #todo get media
+    mmif_str = request.get_data()
+    return display_mmif(mmif_str)
+
 
 def upload_display(filename):
-    with open("temp/" + filename) as f:
-        file = f.read()
-        mmif = Mmif(file)
-        media_fname = 'static'+mmif.get_medium_location(md_type=MediaTypes.V)
-    return render_template('player_page.html', mmif=file, media=media_fname)
+    f = open("temp/" + filename)
+    mmif_str = f.read()
+    f.close()
+    return display_mmif(mmif_str)
+
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
@@ -46,6 +56,7 @@ def upload_file():
       <input type=submit value=Upload>
     </form> 
     '''
+
 
 @app.route('/')
 def hello_world():
