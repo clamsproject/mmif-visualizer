@@ -2,8 +2,7 @@ import os
 
 from clams import Mmif
 from clams.vocab import MediaTypes
-from flask import Flask, request, render_template, flash, redirect, url_for
-import requests
+from flask import Flask, request, render_template, flash, redirect
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -14,7 +13,14 @@ def display_mmif(mmif_str):
     # TODO (krim @ 9/28/19): catch error when no video file specified in the mmif
     # TODO (krim @ 9/28/19): implement this to flexible to any media type (in order of v->a->t)
     media_fname = 'static' + mmif.get_medium_location(md_type=MediaTypes.V)
-    return render_template('player_page.html', mmif=mmif, media=media_fname)
+    annotations = prep_ann_for_viz(mmif)
+    return render_template('player_page.html', mmif=mmif, media=media_fname, annotations=annotations)
+
+
+def prep_ann_for_viz(mmif):
+    anns = [("raw", str(mmif)), ("PP", mmif.pretty())]
+
+    return anns
 
 
 @app.route('/display')
