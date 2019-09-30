@@ -1,21 +1,13 @@
+<link rel="stylesheet" type="text/css" href="static/css/style-vis.css"/>
 <script type="text/javascript" src="static/js/head.load.min.js"></script>
 <script>
     head.js(
         // External libraries
-        'static/js/jquery.min.js',
-        'static/js/jquery.svg.min.js',
-        'static/js/jquery.svgdom.min.js',
-
+        'static/js/jquery.min.js', 'static/js/jquery.svg.min.js', 'static/js/jquery.svgdom.min.js',
         // brat helper modules
-        'static/js/configuration.js',
-        'static/js/util.js',
-        'static/js/annotation_log.js',
-        'static/js/webfont.js',
-
+        'static/js/configuration.js', 'static/js/util.js', 'static/js/annotation_log.js', 'static/js/webfont.js',
         // brat modules
-        'static/js/dispatcher.js',
-        'static/js/url_monitor.js',
-        'static/js/visualizer.js'
+        'static/js/dispatcher.js', 'static/js/url_monitor.js', 'static/js/visualizer.js'
     );
     var webFontURLs = [
         'static/fonts/Astloch-Bold.ttf',
@@ -27,47 +19,15 @@
         return $("#"+textareaId).val();
     };
 
-    var renderBratDisplay =  function (displayId, inputId, confInputId) {
-        var docData = getTextAreaValue(inputId);
-        var collData = getTextAreaValue(confInputId);
-        // Time for some "real" brat coding, let's hook into the dispatcher
-        var liveDispatcher;
-        try{
-            liveDispatcher = Util.embed(displayId,
-                $.extend({'collection': null}, jQuery.parseJSON(collData.trim())),
-                $.extend({}, jQuery.parseJSON(docData.trim())), webFontURLs);
-            console.info("Finished: liveDispatch");
-            $("#preload").fadeOut(4000, function(){});
-        }catch(e) {
-            console.error("ERROR: "+e+" ;doc="+docData+"; coll="+collData);
-        }
-        var renderError = function() {
-            // setting this blows the layout (error --> red)
-            $('#' + displayId).css({'border': '2px solid red'});
-        };
-        liveDispatcher.on('renderError: Fatal', renderError);
-
-    };
     head.ready(function() {
         {#renderBratDisplay("instantbratdisplay", "docjson", "colljson");#}
         var collData = jQuery.parseJSON(getTextAreaValue("colljson").trim());
-        collData.collection = null
         var docData = jQuery.parseJSON(getTextAreaValue("docjson").trim());
-        Util.embed(
-            // id of the div element where brat should embed the visualisations
-            "instantbratdisplay",
-            // object containing collection data
-            collData,
-            // object containing document data
-            docData,
-            // Array containing locations of the visualisation fonts
-            webFontURLs
-        );
+        collData.collection = null;
+        Util.embed("bratdisplay", collData, docData, webFontURLs);
     });
 </script>
-{#{{ brat_annotations | safe }}#}
-{#{{ brat_config | safe }}#}
 <textarea style="display:none" id="docjson">{{ brat_annotations | safe }}</textarea>
 <textarea style="display:none" id="colljson">{{ brat_config | safe }}</textarea>
 
-<div id="instantbratdisplay"></div>
+<div style="height: 100%" id="bratdisplay"></div>
