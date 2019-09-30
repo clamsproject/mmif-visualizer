@@ -1,6 +1,7 @@
 import json
 import os
 import bratify
+import requests
 
 from clams import Mmif
 from clams.vocab import MediaTypes
@@ -39,7 +40,7 @@ def get_brat(mmif, attype):
 
 @app.route('/display')
 def display_file():
-    mmif_str = request.get_data()
+    mmif_str = requests.get(request.args["file"]).text
     return display_mmif(mmif_str)
 
 
