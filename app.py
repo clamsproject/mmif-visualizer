@@ -1,8 +1,10 @@
 import json
 import os
+import bratify
 
 from clams import Mmif
 from clams.vocab import MediaTypes
+from lapps.discriminators import Uri
 from flask import Flask, request, render_template, flash, redirect
 from werkzeug.utils import secure_filename
 
@@ -20,8 +22,19 @@ def display_mmif(mmif_str):
 
 def prep_ann_for_viz(mmif):
     anns = [("PP", "<pre>" + mmif.pretty() + "</pre>")]
+    if Uri.NE in mmif.contains:
+        anns.append(("Entities", get_brat(mmif, Uri.NE)))
 
     return anns
+
+
+def get_brat(mmif, attype):
+    brat_annotations = bratify.mmif_to_brat(mmif, attype)
+    print(brat_annotations)
+    if len(brat_annotations) > 0:
+        brat_config = json.dumps(bratify.config[attype])
+        return render_template("brat.html", brat_annotations=brat_annotations, brat_config=brat_config)
+    return str(None)
 
 
 @app.route('/display')
