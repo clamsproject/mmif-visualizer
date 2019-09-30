@@ -24,7 +24,7 @@
     <div class="card-header">
         <h1 align="center"> Visualizing <abbr title="MultiMedia Interchange Format">MMIF</abbr> </h1>
     </div>
-    <div class="card-body container">
+    <div class="card-body container-fluid">
         <div class="row">
             <div class="col">
                 {% if media %}
@@ -49,7 +49,7 @@
                     </div>
                     {% for annotation in annotations %}
                         <div id="{{ annotation[0] }}" class="tab-pane fade">
-                            <pre>{{ annotation[1] | safe }}</pre>
+                            {{ annotation[1] | safe }}
                         </div>
                     {% endfor %}
                 </div>

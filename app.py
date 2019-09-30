@@ -1,3 +1,4 @@
+import json
 import os
 
 from clams import Mmif
@@ -18,7 +19,7 @@ def display_mmif(mmif_str):
 
 
 def prep_ann_for_viz(mmif):
-    anns = [("raw", str(mmif)), ("PP", mmif.pretty())]
+    anns = [("PP", "<pre>" + mmif.pretty() + "</pre>")]
 
     return anns
 
