@@ -1,25 +1,23 @@
 from lapps.discriminators import Uri
 
-"""
-(parital) list of spacy ner entity types
-"category": "CARDINAL"
-"category": "DATE"
-"category": "GPE"
-"category": "LOC"
-"category": "MONEY"
-"category": "ORDINAL"
-"category": "PERSON"
-"category": "QUANTITY"
-"category": "TIME"
-"category": "ORG"
-"category": "PERCENT"
-"category": "WORK_OF_ART"
-"category": "PRODUCT"
-"category": "LANGUAGE"
-"category": "EVENT"
-"category": "NORP"
-"category": "FAC"
-"""
+# (parital) list of spacy ner entity types
+# "category": "CARDINAL"
+# "category": "DATE"
+# "category": "GPE"
+# "category": "LOC"
+# "category": "MONEY"
+# "category": "ORDINAL"
+# "category": "PERSON"
+# "category": "QUANTITY"
+# "category": "TIME"
+# "category": "ORG"
+# "category": "PERCENT"
+# "category": "WORK_OF_ART"
+# "category": "PRODUCT"
+# "category": "LANGUAGE"
+# "category": "EVENT"
+# "category": "NORP"
+# "category": "FAC"
 
 config = {Uri.NE:
     {"entity_types": [{
