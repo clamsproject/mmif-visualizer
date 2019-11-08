@@ -5,7 +5,7 @@ import requests
 import tempfile
 
 from clams import Mmif
-from clams.vocab import MediaTypes
+from clams.vocab import MediaTypes, AnnotationTypes
 from lapps.discriminators import Uri
 from flask import Flask, request, render_template, flash, redirect
 from werkzeug.utils import secure_filename
@@ -13,8 +13,26 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 
 
-def html_video(vpath):
-    return f"<video controls src={vpath}></video>"
+def view_to_vtt(alignment_view):
+    vtt_file = tempfile.NamedTemporaryFile('w', dir="static/", suffix='.vtt', delete=False)
+    vtt_file.write("WEBVTT\n\n")
+    for annotation in alignment_view.annotations:
+        if annotation.attype == AnnotationTypes.FA:
+            print("FA!!!")
+            # VTT specifically requires timestamps expressed in miliseconds
+            # ISO format can have up to 6 below the decimal point, on the other hand
+            vtt_file.write(f'{annotation.start[:-3]} --> {annotation.end[:-3]}\n{annotation.feature["text"]}\n\n')
+    print(vtt_file.name)
+    return os.sep.join(vtt_file.name.split(os.sep)[-2:])
+
+
+def html_video(vpath, vtt_srcview):
+    sources = f'<source src=\"{vpath}\"> '
+    print(sources)
+    if vtt_srcview is not None:
+        vtt_path = view_to_vtt(vtt_srcview)
+        sources += f'<track kind="subtitles" srclang="en" src="{vtt_path}" default> '
+    return f"<video controls> {sources} </video>"
 
 
 def html_text(tpath):
@@ -32,11 +50,15 @@ def html_audio(apath):
 
 def display_mmif(mmif_str):
     mmif = Mmif(mmif_str)
+    # TODO (krim @ 11/8/19): not just `FA` but for more robust recognition of text-time alignment types
+    fa_view = None
+    if AnnotationTypes.FA in mmif.contains:
+        fa_view = mmif.get_view_by_id(mmif.contains[AnnotationTypes.FA])
     found_media = []    # the order in this list will decide the "default" view in the display
-    try:
-        found_media.append(("Video", html_video('static' + mmif.get_medium_location(md_type=MediaTypes.V))))
-    except:
-        pass
+    # try:
+    found_media.append(("Video", html_video('static' + mmif.get_medium_location(md_type=MediaTypes.V), fa_view)))
+    # except:
+    #     pass
 
     try:
         found_media.append(("Image", html_img('static' + mmif.get_medium_location(md_type=MediaTypes.I))))
