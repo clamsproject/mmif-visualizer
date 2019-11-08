@@ -41,8 +41,51 @@ def html_text(tpath):
         return f"<pre width=\"100%\">\n{t_file.read()}\n</pre>"
 
 
-def html_img(ipath):
-    return f"<img src={ipath}>"
+def html_img(ipath, overlay_annotation=None):
+    return f""" <canvas id="imgCanvas" width="350" height="1000"></canvas>
+                    <script>
+                        var ann_view = {overlay_annotation}
+                        var canvas = document.getElementById('imgCanvas');
+                        var context = canvas.getContext('2d');
+                        var imageObj = new Image();
+                        imageObj.src = '{ipath}';
+                        imageObj.onload = function() {{
+                            var imgWidth = imageObj.naturalWidth;
+                            var screenWidth  = canvas.width;
+                            var scaleX = 1;
+                            if (imgWidth > screenWidth)
+                                scaleX = screenWidth/imgWidth;
+                            var imgHeight = imageObj.naturalHeight;
+                            var screenHeight = canvas.height;
+                            var scaleY = 1;
+                            if (imgHeight > screenHeight)
+                                scaleY = screenHeight/imgHeight;
+                            var scale = scaleY;
+                            if(scaleX < scaleY)
+                                scale = scaleX;
+                            if(scale < 1){{
+                                imgHeight = imgHeight*scale;
+                                imgWidth = imgWidth*scale;
+                            }}
+                            canvas.height = imgHeight;
+                            canvas.width = imgWidth;
+                            context.drawImage(imageObj, 0, 0, imageObj.naturalWidth, imageObj.naturalHeight, 0,0, imgWidth, imgHeight);
+                                                    context.beginPath();
+                            context.lineWidth = "4";
+                            context.strokeStyle = "green";
+                            context.scale(scale, scale);
+                            for (var i=0; i < ann_view["annotations"].length; i++){{
+                                var box = ann_view["annotations"][i];
+                                var coord = (box["feature"]["box"]);
+                                x = coord[0];
+                                y = coord[1];
+                                w = coord[2] - coord[0];
+                                h = coord[3] - coord[1];
+                                context.rect(x, y, w, h);
+                            }}
+                            context.stroke();
+                        }}
+                    </script>"""
 
 
 def html_audio(apath):
@@ -62,7 +105,14 @@ def display_mmif(mmif_str):
         pass
 
     try:
-        found_media.append(("Image", html_img('static' + mmif.get_medium_location(md_type=MediaTypes.I))))
+        try:
+            tboxes = mmif.get_view_contains(AnnotationTypes.TBOX)
+            print(tboxes)
+        except:
+            tboxes = None
+        found_media.append(("Image",
+                            html_img('static' + mmif.get_medium_location(md_type=MediaTypes.I), tboxes)
+                          ))
     except:
         pass
 
