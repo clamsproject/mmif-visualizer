@@ -1,5 +1,6 @@
 import json
 import os
+import displacy
 import bratify
 import requests
 import tempfile
@@ -82,7 +83,7 @@ def display_mmif(mmif_str):
 def prep_ann_for_viz(mmif):
     anns = [("PP", "<pre>" + mmif.pretty() + "</pre>")]
     if Uri.NE in mmif.contains:
-        anns.append(("Entities", get_brat(mmif, Uri.NE)))
+        anns.append(("Entities", displacy.get_displacy(mmif)))
 
     return anns
 

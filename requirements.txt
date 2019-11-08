@@ -2,5 +2,6 @@ Flask==1.0.2
 Flask-RESTful==0.3.6
 requests==2.21.0
 lapps==0.0.2
+spacy
 
 git+https://github.com/clamsproject/clams-python-sdk.git@deserial
