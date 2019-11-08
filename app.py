@@ -56,10 +56,10 @@ def display_mmif(mmif_str):
     if AnnotationTypes.FA in mmif.contains:
         fa_view = mmif.get_view_by_id(mmif.contains[AnnotationTypes.FA])
     found_media = []    # the order in this list will decide the "default" view in the display
-    # try:
-    found_media.append(("Video", html_video('static' + mmif.get_medium_location(md_type=MediaTypes.V), fa_view)))
-    # except:
-    #     pass
+    try:
+        found_media.append(("Video", html_video('static' + mmif.get_medium_location(md_type=MediaTypes.V), fa_view)))
+    except:
+        pass
 
     try:
         found_media.append(("Image", html_img('static' + mmif.get_medium_location(md_type=MediaTypes.I))))
