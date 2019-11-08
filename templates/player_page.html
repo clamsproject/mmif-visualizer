@@ -26,11 +26,29 @@
     </div>
     <div class="card-body container-fluid">
         <div class="row">
-            <div class="col">
-                {% if media %}
-                    <video controls src={{ media }}></video>
-                {% endif %}
+            <div class="col" style="border-right: 2px solid #ccc";>
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-toggle="tab" href="#{{ media[0][0] }}">{{ media[0][0] }}</a>
+                    </li>
+                    {% for medium in media[1:] %}
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#{{ medium[0] }}">{{ medium[0] }}</a>
+                        </li>
+                    {%  endfor %}
+                </ul>
+                <div class="tab-content">
+                    <div id="{{ media[0][0] }}" class="tab-pane fade show active">
+                        {{ media[0][1] | safe }}
+                    </div>
+                    {% for medium in media[1:] %}
+                        <div id="{{ medium[0] }}" class="tab-pane fade">
+                            {{ medium[1] | safe }}
+                        </div>
+                    {% endfor %}
+                </div>
             </div>
+
             <div class="col-lg-8">
                 <ul class="nav nav-tabs">
                     <li class="nav-item">

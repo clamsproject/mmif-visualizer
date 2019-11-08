@@ -2,6 +2,7 @@ import json
 import os
 import bratify
 import requests
+import tempfile
 
 from clams import Mmif
 from clams.vocab import MediaTypes
@@ -12,13 +13,48 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 
 
+def html_video(vpath):
+    return f"<video controls src={vpath}></video>"
+
+
+def html_text(tpath):
+    with open(tpath) as t_file:
+        return f"<pre width=\"100%\">\n{t_file.read()}\n</pre>"
+
+
+def html_img(ipath):
+    return f"<img src={ipath}>"
+
+
+def html_audio(apath):
+    return f"<audio controls src={apath}></audio>"
+
+
 def display_mmif(mmif_str):
     mmif = Mmif(mmif_str)
-    # TODO (krim @ 9/28/19): catch error when no video file specified in the mmif
-    # TODO (krim @ 9/28/19): implement this to flexible to any media type (in order of v->a->t)
-    media_fname = 'static' + mmif.get_medium_location(md_type=MediaTypes.V)
+    found_media = []    # the order in this list will decide the "default" view in the display
+    try:
+        found_media.append(("Video", html_video('static' + mmif.get_medium_location(md_type=MediaTypes.V))))
+    except:
+        pass
+
+    try:
+        found_media.append(("Image", html_img('static' + mmif.get_medium_location(md_type=MediaTypes.I))))
+    except:
+        pass
+
+    try:
+        found_media.append(("Audio", html_audio('static' + mmif.get_medium_location(md_type=MediaTypes.A))))
+    except:
+        pass
+
+    try:
+        found_media.append(("Text", html_text('static' + mmif.get_medium_location(md_type=MediaTypes.T))))
+    except:
+        pass
+
     annotations = prep_ann_for_viz(mmif)
-    return render_template('player_page.html', mmif=mmif, media=media_fname, annotations=annotations)
+    return render_template('player_page.html', mmif=mmif, media=found_media, annotations=annotations)
 
 
 def prep_ann_for_viz(mmif):
