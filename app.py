@@ -4,7 +4,7 @@ import bratify
 import requests
 
 from clams import Mmif
-from clams.vocab import MediaTypes
+from clams.vocab import MediaTypes, AnnotationTypes
 from lapps.discriminators import Uri
 from flask import Flask, request, render_template, flash, redirect
 from werkzeug.utils import secure_filename
@@ -16,16 +16,24 @@ def display_mmif(mmif_str):
     mmif = Mmif(mmif_str)
     # TODO (krim @ 9/28/19): catch error when no video file specified in the mmif
     # TODO (krim @ 9/28/19): implement this to flexible to any media type (in order of v->a->t)
-    media_fname = 'static' + mmif.get_medium_location(md_type=MediaTypes.V)
+    media_fname = ""
+    try:
+        media_fname = 'static' + mmif.get_medium_location(md_type=MediaTypes.V)[23:]
+    except Exception as _:
+        try: ### its an image
+            media_fname = 'static' + mmif.get_medium_location(md_type=MediaTypes.I)[23:]
+
+        except Exception as e:
+            print (e)
+
     annotations = prep_ann_for_viz(mmif)
-    return render_template('player_page.html', mmif=mmif, media=media_fname, annotations=annotations)
+    return render_template('player_page.html', mmif=mmif, media=media_fname, boxes=mmif.get_view_contains(AnnotationTypes.TBOX), annotations=annotations)
 
 
 def prep_ann_for_viz(mmif):
     anns = [("PP", "<pre>" + mmif.pretty() + "</pre>")]
     if Uri.NE in mmif.contains:
         anns.append(("Entities", get_brat(mmif, Uri.NE)))
-
     return anns
 
 

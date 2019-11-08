@@ -9,7 +9,7 @@ from .brat_configs import config
 def mmif_to_brat(mmif: Mmif, attype):
     view = mmif.get_view_contains(attype)
     if view:
-        text_fp = open("static" + mmif.get_medium_location(MediaTypes.T))
+        text_fp = open("static" + mmif.get_medium_location(MediaTypes.T)[6:])
         text = text_fp.read()
         text_fp.close()
         doc_data = {'text': text}
