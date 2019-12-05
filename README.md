@@ -6,7 +6,7 @@ This web app visualizes different annotation component in a single MMIF file. Fo
 
 1. Video or Audio file player via HTML5
 1. raw and pretty-printed MMIF contents (MMIF is syntactically JSON)
-1. NE annotations via [brat](https://www.github.com/nlplab/brat)
+1. NE annotations via [displaCy](https://explosion.ai/demos/displacy-ent)
 
 ## Installation 
 

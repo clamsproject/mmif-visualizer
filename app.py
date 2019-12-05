@@ -1,7 +1,6 @@
 import json
 import os
 import displacy
-import bratify
 import requests
 import tempfile
 
@@ -136,15 +135,6 @@ def prep_ann_for_viz(mmif):
         anns.append(("Entities", displacy.get_displacy(mmif)))
 
     return anns
-
-
-def get_brat(mmif, attype):
-    brat_annotations = bratify.mmif_to_brat(mmif, attype)
-    print(brat_annotations)
-    if len(brat_annotations) > 0:
-        brat_config = json.dumps(bratify.config[attype])
-        return render_template("brat.html", brat_annotations=brat_annotations, brat_config=brat_config)
-    return str(None)
 
 
 @app.route('/display')
