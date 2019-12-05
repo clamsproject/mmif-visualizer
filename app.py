@@ -44,7 +44,7 @@ def html_text(tpath):
 def html_img(ipath, overlay_annotation=None):
     return f""" <canvas id="imgCanvas" width="350" height="1000"></canvas>
                     <script>
-                        var ann_view = {overlay_annotation}
+                        var ann_view = {overlay_annotation if overlay_annotation is not None else {{"annotations: []"}}}
                         var canvas = document.getElementById('imgCanvas');
                         var context = canvas.getContext('2d');
                         var imageObj = new Image();
