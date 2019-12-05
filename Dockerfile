@@ -1,10 +1,13 @@
-FROM python:3.7
+FROM ubuntu:19.10
 
-COPY ./ /app
-WORKDIR /app
 
-RUN python -m pip install --upgrade pip
-RUN pip install -r requirements.txt
+RUN apt-get update && \
+    apt-get install -y git python3 python3-pip python3-setuptools
 
-ENTRYPOINT ["python"]
+COPY ./ ./app
+WORKDIR ./app
+RUN pip3 install -r requirements.txt
+
+
+ENTRYPOINT ["python3"]
 CMD ["app.py"]
