@@ -99,41 +99,42 @@ def display_mmif(mmif_str):
         fa_view = mmif.get_view_by_id(mmif.contains[AnnotationTypes.FA])
     found_media = []    # the order in this list will decide the "default" view in the display
     try:
-        found_media.append(("Video", html_video('static' + mmif.get_medium_location(md_type=MediaTypes.V), fa_view)))
+        found_media.append(
+            ("Video",
+             html_video('static' + mmif.get_medium_location(md_type=MediaTypes.V), fa_view)))
     except:
         pass
-
     try:
         try:
             tboxes = mmif.get_view_contains(AnnotationTypes.TBOX)
             print(tboxes)
         except:
             tboxes = None
-        found_media.append(("Image",
-                            html_img('static' + mmif.get_medium_location(md_type=MediaTypes.I), tboxes)
-                          ))
+        found_media.append(
+            ("Image",
+             html_img('static' + mmif.get_medium_location(md_type=MediaTypes.I), tboxes)))
     except:
         pass
-
     try:
-        found_media.append(("Audio", html_audio('static' + mmif.get_medium_location(md_type=MediaTypes.A))))
+        found_media.append(
+            ("Audio",
+             html_audio('static' + mmif.get_medium_location(md_type=MediaTypes.A))))
     except:
         pass
-
     try:
-        found_media.append(("Text", html_text('static' + mmif.get_medium_location(md_type=MediaTypes.T))))
+        found_media.append(
+            ("Text",
+             html_text('static' + mmif.get_medium_location(md_type=MediaTypes.T))))
     except:
         pass
-
     annotations = prep_ann_for_viz(mmif)
     return render_template('player_page.html', mmif=mmif, media=found_media, annotations=annotations)
 
 
 def prep_ann_for_viz(mmif):
-    anns = [("PP", "<pre>" + mmif.pretty() + "</pre>")]
+    anns = [("MMIF", "<pre>" + mmif.pretty() + "</pre>")]
     if Uri.NE in mmif.contains:
         anns.append(("Entities", displacy.get_displacy(mmif)))
-
     return anns
 
 
