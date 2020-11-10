@@ -1,7 +1,14 @@
 from spacy import displacy
-from clams import MediaTypes, Annotation
-from clams import Mmif
+
+from mmif.serialize import *
+from mmif.vocabulary import AnnotationTypes
+from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
+
+
+# This is where the documents live.
+# TODO: this is somewhat inconsistent with app.py
+PATH_PREFIX = '/mmif-viz/static/'
 
 
 def get_displacy(mmif: Mmif):
@@ -9,26 +16,26 @@ def get_displacy(mmif: Mmif):
 
 
 def mmif_to_displacy_dict(mmif: Mmif):
-    # NOTE: location was not following the requirement to be where advertized
-    transcript_location = mmif.get_medium_location(MediaTypes.T)
-    transcript_location = '/mmif-viz/static/' + transcript_location
+    # TODO: this is hard-coded to a transcript in the documents list, should be
+    # to a TextDocument in the views or a set of TextDocuments in the views.
+    transcript_location = None
+    for document in mmif.documents:
+        if document.at_type.endswith('TextDocument'):
+            transcript_location = document.location
+    transcript_location = PATH_PREFIX + transcript_location
     displacy_dict = {}
-    # not sure why this one breaks, for now hardcoding it
-    # ne_view = mmif.get_view_contains(Uri.NE)
-    ne_view = mmif.views[0]
+    ne_view = mmif.get_view_contains(Uri.NE)
     with open(transcript_location) as transcript_file:
         displacy_dict['text'] = transcript_file.read()
-        # NOTE: this was a dictionary, not an object
-        # displacy_dict['ents'] = [displacy_entity(ann) for ann in ne_view.annotations if ann.attype == Uri.NE]
-        displacy_dict['ents'] = [displacy_entity(ann) for ann in ne_view['annotations'] if ann["@type"] == Uri.NE]
+        displacy_dict['ents'] = [entity(ann) for ann in ne_view['annotations']]
         displacy_dict['title'] = None
     return displacy_dict
 
 
-def displacy_entity(annotation: Annotation):
-    # NOTE: this is a dictionary
-    # return {'start': annotation.start, 'end': annotation.end, 'label': annotation.feature['category']}
-    return {'start': annotation['start'], 'end': annotation['end'], 'label': annotation['feature']['category']}
+def entity(annotation: Annotation):
+    return {'start': annotation.properties['start'],
+            'end': annotation.properties['end'],
+            'label': annotation.properties['category']}
 
 
 def displacy_dict_to_ent_html(d):
