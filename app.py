@@ -13,6 +13,10 @@ from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
 
 
+PATH_PREFIX = 'static'
+PATH_PREFIX = ''
+
+
 # these two static folder-related params are very important
 app = Flask(__name__, static_folder='static', static_url_path='')
 
@@ -39,6 +43,7 @@ def get_alignments(alignment_view):
 
 def html_video(vpath, vtt_srcview=None):
     # TODO: may not need vtt_srcview since we now put that in a tab
+    #print('>>> vid', vpath)
     sources = f'<source src=\"{vpath}\"> '
     if vtt_srcview is not None:
         vtt_path = view_to_vtt(vtt_srcview)
@@ -47,7 +52,8 @@ def html_video(vpath, vtt_srcview=None):
 
 
 def html_text(tpath):
-    with open(tpath) as t_file:
+    # TODO: needed to do this to make it run
+    with open('static' + tpath) as t_file:
         return f"<pre width=\"100%\">\n{t_file.read()}\n</pre>"
 
 
@@ -146,7 +152,7 @@ def prep_annotations(mmif):
         vtt_file = view_to_vtt(fa_view)
         tabs.append(("WEBVTT", '<pre>' + open(vtt_file).read() + '</pre>'))
     for ner_view in get_ner_views(mmif):
-        print('>>>', ner_view.id, ner_view.metadata.contains)
+        #print('>>>', ner_view.id, ner_view.metadata.contains)
         visualization = create_ner_visualization(mmif, ner_view)
         tabs.append(("Entities-%s" % ner_view.id, visualization))
     return tabs
