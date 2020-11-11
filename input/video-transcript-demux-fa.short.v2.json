@@ -8,14 +8,14 @@
 	    "@type": "VideoDocument",
 	    "properties": {
 		"id": "d0",
-		"location": "/archive/video/cpb-aacip-507-z31ng4hp5t.part.mp4"
+		"location": "/var/archive/video/cpb-aacip-507-z31ng4hp5t.part.mp4"
 	    }
 	},
 	{
 	    "@type": "TextDocument",
 	    "properties": {
 		"id": "d1",
-		"location": "/archive/text/cpb-aacip-507-z31ng4hp5t.part.trn"
+		"location": "/var/archive/text/cpb-aacip-507-z31ng4hp5t.part.trn"
 	    }
 	}
     ],

@@ -13,10 +13,6 @@ from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
 
 
-PATH_PREFIX = 'static'
-PATH_PREFIX = ''
-
-
 # these two static folder-related params are very important
 app = Flask(__name__, static_folder='static', static_url_path='')
 
@@ -52,8 +48,7 @@ def html_video(vpath, vtt_srcview=None):
 
 
 def html_text(tpath):
-    # TODO: needed to do this to make it run
-    with open('static' + tpath) as t_file:
+    with open(tpath) as t_file:
         return f"<pre width=\"100%\">\n{t_file.read()}\n</pre>"
 
 
@@ -119,7 +114,7 @@ def display_mmif(mmif_str):
     found_media = []
     for document in mmif.documents:
         doc_type = get_document_type_short_form(document)
-        doc_path = PATH_PREFIX + document.location
+        doc_path = document.location
         if doc_type == 'Text':
             found_media.append(('Text', html_text(doc_path)))
         elif doc_type == 'Video':

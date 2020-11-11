@@ -6,10 +6,6 @@ from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
 
 
-# Changed because it does not work for appliances
-PATH_PREFIX = 'static'
-
-
 def get_displacy(mmif: Mmif):
     return displacy_dict_to_ent_html(mmif_to_displacy_dict(mmif))
 
@@ -54,7 +50,7 @@ def read_text(textdoc):
     """Read the text content from the document or the text value."""
     # TODO: this was adapted from the spacy app, should be in mmif (check that)
     if textdoc.location:
-        location = PATH_PREFIX + textdoc.location
+        location = textdoc.location
         #print('>>> loc', location)
         with open(location) as fh:
             text = fh.read()
@@ -72,7 +68,7 @@ def mmif_to_dict(mmif: Mmif):
     for document in mmif.documents:
         if document.at_type.endswith('TextDocument'):
             transcript_location = document.location
-    transcript_location = PATH_PREFIX + transcript_location
+    transcript_location = transcript_location
     displacy_dict = {}
     ne_view = mmif.get_view_contains(Uri.NE)
     with open(transcript_location) as transcript_file:
