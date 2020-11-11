@@ -55,10 +55,12 @@
             </div>
 
             <div class="col-lg-8">
-                <ul class="nav nav-tabs">
+              <ul class="nav nav-tabs">
+		<!--
                     <li class="nav-item">
                         <a class="nav-link active" data-toggle="tab" href="#rawmmif">Raw MMIF</a>
                     </li>
+		-->
                     {% for annotation in annotations %}
                         <li class="nav-item">
                             <a class="nav-link" data-toggle="tab" href="#{{ annotation[0] }}">{{ annotation[0] }}</a>

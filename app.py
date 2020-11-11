@@ -4,31 +4,41 @@ import displacy
 import requests
 import tempfile
 
-from clams import Mmif
-from clams.vocab import MediaTypes, AnnotationTypes
-from lapps.discriminators import Uri
 from flask import Flask, request, render_template, flash, redirect
 from werkzeug.utils import secure_filename
 
-app = Flask(__name__)
+from mmif.serialize import *
+from mmif.vocabulary import AnnotationTypes
+from mmif.vocabulary import DocumentTypes
+from lapps.discriminators import Uri
+
+
+# these two static folder-related params are very important
+app = Flask(__name__, static_folder='static', static_url_path='')
 
 
 def view_to_vtt(alignment_view):
+    vtt_file = get_alignments(alignment_view)
+    return os.sep.join(vtt_file.name.split(os.sep)[-2:])
+
+
+def get_alignments(alignment_view):
+    # TODO: maybe just use a string buffer
     vtt_file = tempfile.NamedTemporaryFile('w', dir="static/", suffix='.vtt', delete=False)
-    vtt_file.write("WEBVTT\n\n")
     for annotation in alignment_view.annotations:
-        if annotation.attype == AnnotationTypes.FA:
-            print("FA!!!")
+        if annotation.at_type == "vanilla-forced-alignment":
             # VTT specifically requires timestamps expressed in miliseconds
             # ISO format can have up to 6 below the decimal point, on the other hand
-            vtt_file.write(f'{annotation.start[:-3]} --> {annotation.end[:-3]}\n{annotation.feature["text"]}\n\n')
-    print(vtt_file.name)
-    return os.sep.join(vtt_file.name.split(os.sep)[-2:])
+            # Assuming start and end are in miliseconds
+            start = annotation.properties['start']
+            end = annotation.properties['end']
+            text = annotation.properties['word']
+            vtt_file.write(f'{start} --> {end}\n{text}\n\n')
+    return vtt_file
 
 
 def html_video(vpath, vtt_srcview):
     sources = f'<source src=\"{vpath}\"> '
-    print(sources)
     if vtt_srcview is not None:
         vtt_path = view_to_vtt(vtt_srcview)
         sources += f'<track kind="subtitles" srclang="en" src="{vtt_path}" default> '
@@ -92,49 +102,72 @@ def html_audio(apath):
 
 
 def display_mmif(mmif_str):
+
     mmif = Mmif(mmif_str)
-    # TODO (krim @ 11/8/19): not just `FA` but for more robust recognition of text-time alignment types
-    fa_view = None
-    if AnnotationTypes.FA in mmif.contains:
-        fa_view = mmif.get_view_by_id(mmif.contains[AnnotationTypes.FA])
-    found_media = []    # the order in this list will decide the "default" view in the display
-    try:
-        found_media.append(("Video", html_video('static' + mmif.get_medium_location(md_type=MediaTypes.V), fa_view)))
-    except:
-        pass
 
-    try:
-        try:
-            tboxes = mmif.get_view_contains(AnnotationTypes.TBOX)
-            print(tboxes)
-        except:
-            tboxes = None
-        found_media.append(("Image",
-                            html_img('static' + mmif.get_medium_location(md_type=MediaTypes.I), tboxes)
-                          ))
-    except:
-        pass
+    # TODO: the order in this list decides the default view in the display
+    # (which is the first one), this used to be done specifically by adding the
+    # video first, but it is now determined by the order in the documents list
+    # in the MMIF object. May need to change that if the video is not the first
+    # one in the MMIF file.
+    found_media = []
 
-    try:
-        found_media.append(("Audio", html_audio('static' + mmif.get_medium_location(md_type=MediaTypes.A))))
-    except:
-        pass
-
-    try:
-        found_media.append(("Text", html_text('static' + mmif.get_medium_location(md_type=MediaTypes.T))))
-    except:
-        pass
+    for document in mmif.documents:
+        doc_type = get_document_type_short_form(document)
+        doc_path = PATH_PREFIX + document.location
+        if doc_type == 'Text':
+            found_media.append(('Text', html_text(doc_path)))
+        elif doc_type == 'Video':
+            fa_view = get_alignment_view(mmif)
+            found_media.append(("Video", html_video(doc_path, fa_view)))
+        elif doc_type == 'Audio':
+            found_media.append(("Audio", html_audio(doc_path)))
+        elif doc_type == 'Image':
+            # TODO: this is broken now
+            try:
+                tboxes = mmif.get_view_contains(AnnotationTypes.TBOX)
+            except:
+                tboxes = None
+            found_media.append(("Image", html_img(doc_path, tboxes)))
 
     annotations = prep_ann_for_viz(mmif)
-    return render_template('player_page.html', mmif=mmif, media=found_media, annotations=annotations)
+    return render_template('player_page.html',
+                           mmif=mmif,
+                           media=found_media,
+                           annotations=annotations)
+
+
+def get_document_type_short_form(document):
+    document_type = os.path.split(document.at_type)[1]
+    return document_type[:-8]
 
 
 def prep_ann_for_viz(mmif):
-    anns = [("PP", "<pre>" + mmif.pretty() + "</pre>")]
-    if Uri.NE in mmif.contains:
+    anns = [("MMIF", "<pre>" + mmif.serialize(pretty=True) + "</pre>")]
+    ner_view = get_first_ner_view(mmif)
+    alignment_view = get_alignment_view(mmif)
+    if alignment_view is not None:
+        vtt_file = view_to_vtt(alignment_view)
+        anns.append(("WEBVTT", '<pre>' + open(vtt_file).read() + '</pre>'))
+    if ner_view is not None:
         anns.append(("Entities", displacy.get_displacy(mmif)))
-
     return anns
+
+
+def get_first_ner_view(mmif):
+    for view in mmif.views:
+        if Uri.NE in view.metadata.contains:
+            return view
+
+
+def get_alignment_view(mmif):
+    # TODO:
+    # - replace this with new way to find the alignments
+    # - (krim @ 11/8/19): not just `FA` but for more robust recognition
+    #   of text-time alignment types
+    for view in mmif.views:
+        if "vanilla-forced-alignment" in view.metadata.contains:
+            return view
 
 
 @app.route('/display')
@@ -185,4 +218,4 @@ def hello_world():
 
 if __name__ == '__main__':
     # TODO (krim @ 10/1/19): parameterize port number
-    app.run(port=5000, host='0.0.0.0', debug=True)
+    app.run(port=9002, host='0.0.0.0', debug=True)

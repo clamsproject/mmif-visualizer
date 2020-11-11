@@ -3,6 +3,8 @@
 .directory # KDE directory preferences
 .Trash-* # Linux trash folder which might appear on any partition or disk
 
+temp/*
+
 # macos
 .DS_Store
 .AppleDouble
@@ -68,3 +70,7 @@ gdrive_shared*/
 # ctag generated file
 tags
 .tags
+
+# static archival files
+static/*
+
