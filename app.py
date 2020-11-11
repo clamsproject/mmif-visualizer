@@ -41,7 +41,8 @@ def get_alignments(alignment_view):
     return vtt_file
 
 
-def html_video(vpath, vtt_srcview):
+def html_video(vpath, vtt_srcview=None):
+    # TODO: may not need vtt_srcview since we now put that in a tab
     sources = f'<source src=\"{vpath}\"> '
     if vtt_srcview is not None:
         vtt_path = view_to_vtt(vtt_srcview)
@@ -106,35 +107,28 @@ def html_audio(apath):
 
 
 def display_mmif(mmif_str):
-
-    mmif = Mmif(mmif_str)
-
+    """Return the MMIF string rendered as an HTML document."""
     # TODO: the order in this list decides the default view in the display
     # (which is the first one), this used to be done specifically by adding the
     # video first, but it is now determined by the order in the documents list
     # in the MMIF object. May need to change that if the video is not the first
     # one in the MMIF file.
+    mmif = Mmif(mmif_str)
     found_media = []
-
     for document in mmif.documents:
         doc_type = get_document_type_short_form(document)
         doc_path = PATH_PREFIX + document.location
         if doc_type == 'Text':
             found_media.append(('Text', html_text(doc_path)))
         elif doc_type == 'Video':
-            fa_view = get_alignment_view(mmif)
-            found_media.append(("Video", html_video(doc_path, fa_view)))
+            found_media.append(("Video", html_video(doc_path)))
         elif doc_type == 'Audio':
             found_media.append(("Audio", html_audio(doc_path)))
         elif doc_type == 'Image':
             # TODO: this is broken now
-            try:
-                tboxes = mmif.get_view_contains(AnnotationTypes.TBOX)
-            except:
-                tboxes = None
+            tboxes = mmif.get_view_contains(AnnotationTypes.TBOX)
             found_media.append(("Image", html_img(doc_path, tboxes)))
-
-    annotations = prep_ann_for_viz(mmif)
+    annotations = prep_annotations(mmif)
     return render_template('player_page.html',
                            mmif=mmif,
                            media=found_media,
@@ -142,36 +136,51 @@ def display_mmif(mmif_str):
 
 
 def get_document_type_short_form(document):
+    """Returns 'Video', 'Text', 'Audio' or 'Image' from the document type of
+    the document."""
     document_type = os.path.split(document.at_type)[1]
     return document_type[:-8]
 
 
-def prep_ann_for_viz(mmif):
-    anns = [("MMIF", "<pre>" + mmif.serialize(pretty=True) + "</pre>")]
-    ner_view = get_first_ner_view(mmif)
-    alignment_view = get_alignment_view(mmif)
-    if alignment_view is not None:
-        vtt_file = view_to_vtt(alignment_view)
-        anns.append(("WEBVTT", '<pre>' + open(vtt_file).read() + '</pre>'))
-    if ner_view is not None:
-        anns.append(("Entities", displacy.get_displacy(mmif)))
-    return anns
+def prep_annotations(mmif):
+    """Prepare annotations from the views, and return a list of pairs of tabname
+    and tab content. The first tab is alway the full MMIF pretty print."""
+    tabs = [("MMIF", "<pre>" + mmif.serialize(pretty=True) + "</pre>")]
+    for fa_view in get_alignment_views(mmif):
+        vtt_file = view_to_vtt(fa_view)
+        tabs.append(("WEBVTT", '<pre>' + open(vtt_file).read() + '</pre>'))
+    for ner_view in get_ner_views(mmif):
+        print('>>>', ner_view.id, ner_view.metadata.contains)
+        visualization = create_ner_visualization(mmif, ner_view)
+        tabs.append(("Entities-%s" % ner_view.id, visualization))
+    return tabs
 
 
-def get_first_ner_view(mmif):
-    for view in mmif.views:
-        if Uri.NE in view.metadata.contains:
-            return view
+def create_ner_visualization(mmif, view):
+    metadata = view.metadata.contains.get(Uri.NE)
+    try:
+        # all the view's named entities refer to the same text document (kaldi)
+        document_id = metadata['document']
+        return displacy.visualize_ner(mmif, view, document_id)
+    except KeyError:
+        # the view's entities refer to more than one text document (tessearct)
+        pass
 
 
-def get_alignment_view(mmif):
+def get_alignment_views(mmif):
     # TODO:
     # - replace this with new way to find the alignments
     # - (krim @ 11/8/19): not just `FA` but for more robust recognition
     #   of text-time alignment types
+    views = []
     for view in mmif.views:
         if "vanilla-forced-alignment" in view.metadata.contains:
-            return view
+            views.append(view)
+    return views
+
+
+def get_ner_views(mmif):
+    return [v for v in mmif.views if Uri.NE in v.metadata.contains]
 
 
 @app.route('/display')
@@ -181,10 +190,9 @@ def display_file():
 
 
 def upload_display(filename):
-    f = open("temp/" + filename)
-    mmif_str = f.read()
-    f.close()
-    return display_mmif(mmif_str)
+    with open("temp/" + filename) as fh:
+        mmif_str = fh.read()
+        return display_mmif(mmif_str)
 
 
 @app.route('/upload', methods=['GET', 'POST'])

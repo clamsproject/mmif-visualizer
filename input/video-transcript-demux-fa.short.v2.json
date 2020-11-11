@@ -7,14 +7,14 @@
 	{
 	    "@type": "VideoDocument",
 	    "properties": {
-		"id": "0",
+		"id": "d0",
 		"location": "/archive/video/cpb-aacip-507-z31ng4hp5t.part.mp4"
 	    }
 	},
 	{
 	    "@type": "TextDocument",
 	    "properties": {
-		"id": "1",
+		"id": "d1",
 		"location": "/archive/text/cpb-aacip-507-z31ng4hp5t.part.trn"
 	    }
 	}
@@ -23,42 +23,11 @@
     "views": [
 
 	{
-	    "id": "v_1",
-
-	    "metadata": {
-		"contains": {
-		    "http://vocab.lappsgrid.org/NamedEntity": {
-			"producer": "spaCy",
-			"gen_time": "2018-10-08T06:05:33.183134" }}},
-	    
-	    "annotations": [
-		{
-		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
-		    "properties": {
-			"id": "ne1",
-			"start": 0,
-			"end": 6,
-			"category": "Person"
-		    }
-		},
-		{
-		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
-		    "properties": {
-			"id": "ne2",
-			"start": 50,
-			"end": 74,
-			"category": "Organization"
-		    }
-		}
-	    ]
-	},
-
-	{
 	    "id": "v_0",
 	    "metadata": {
+		"app": "FilteredMontrealForcedAligner",
 		"contains": {
 		    "vanilla-forced-alignment": {
-			"producer": "FilteredMontrealForcedAligner",
 			"gen_time": "2018-10-08T06:05:33.183134"
 		    }
 		}
@@ -84,6 +53,119 @@
 		    }
 		}
 	    ]
+	},
+	
+	{
+	    "id": "v_1",
+
+	    "metadata": {
+		"app": "spaCy",
+		"contains": {
+		    "http://vocab.lappsgrid.org/NamedEntity": {
+			"document": "d1",
+			"gen_time": "2018-10-08T06:05:33.183134" }}},
+	    
+	    "annotations": [
+		{
+		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
+		    "properties": {
+			"id": "ne1",
+			"start": 0,
+			"end": 6,
+			"category": "PERSON"
+		    }
+		},
+		{
+		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
+		    "properties": {
+			"id": "ne2",
+			"start": 50,
+			"end": 74,
+			"category": "ORG"
+		    }
+		},
+		{
+		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
+		    "properties": {
+			"id": "ne3",
+			"start": 173,
+			"end": 180,
+			"category": "GPE"
+		    }
+		},
+		{
+		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
+		    "properties": {
+			"id": "ne4",
+			"start": 181,
+			"end": 197,
+			"category": "ORG"
+		    }
+		},
+		{
+		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
+		    "properties": {
+			"id": "ne5",
+			"start": 201,
+			"end": 214,
+			"category": "PERSON"
+		    }
+		}
+		
+	    ]
+	},
+
+	{
+	    "id": "v_2",
+
+	    "metadata": {
+		"app": "kaldi",
+		"contains": {
+		    "TextDocument": {
+			"gen_time": "2018-10-08T06:05:33.183134" }}},
+	    
+	    "annotations": [
+		{
+		    "@type": "TextDocument",
+		    "properties": {
+			"id": "td1",
+			"text": { "@value": "I am Jim Lehrer in Boston." }
+		    }
+		}
+	    ]
+	},
+
+	{
+	    "id": "v_3",
+
+	    "metadata": {
+		"app": "spaCy",
+		"contains": {
+		    "http://vocab.lappsgrid.org/NamedEntity": {
+			"document": "v_2:td1",
+			"gen_time": "2018-10-08T06:05:33.183134" }}},
+	    
+	    "annotations": [
+		{
+		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
+		    "properties": {
+			"id": "ne1",
+			"start": 5,
+			"end": 15,
+			"category": "Person"
+		    }
+		},
+		{
+		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
+		    "properties": {
+			"id": "ne2",
+			"start": 19,
+			"end": 25,
+			"category": "Location"
+		    }
+		}
+	    ]
 	}
+	
     ]
 }
