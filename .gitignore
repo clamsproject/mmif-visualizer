@@ -70,3 +70,7 @@ gdrive_shared*/
 # ctag generated file
 tags
 .tags
+
+# static archival files
+static/*
+
