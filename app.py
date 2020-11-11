@@ -114,7 +114,7 @@ def display_mmif(mmif_str):
 
     for document in mmif.documents:
         doc_type = get_document_type_short_form(document)
-        doc_path = PATH_PREFIX + document.location
+        doc_path = document.location
         if doc_type == 'Text':
             found_media.append(('Text', html_text(doc_path)))
         elif doc_type == 'Video':
@@ -218,4 +218,4 @@ def hello_world():
 
 if __name__ == '__main__':
     # TODO (krim @ 10/1/19): parameterize port number
-    app.run(port=9002, host='0.0.0.0', debug=True)
+    app.run(port=5000, host='0.0.0.0', debug=True)

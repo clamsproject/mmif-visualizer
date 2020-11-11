@@ -17,7 +17,7 @@ def mmif_to_displacy_dict(mmif: Mmif):
     for document in mmif.documents:
         if document.at_type.endswith('TextDocument'):
             transcript_location = document.location
-    transcript_location = PATH_PREFIX + transcript_location
+    transcript_location = transcript_location
     displacy_dict = {}
     ne_view = mmif.get_view_contains(Uri.NE)
     with open(transcript_location) as transcript_file:
