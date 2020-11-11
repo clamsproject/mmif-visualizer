@@ -6,11 +6,6 @@ from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
 
 
-# This is where the documents live.
-# TODO: this is somewhat inconsistent with app.py
-PATH_PREFIX = '/mmif-viz/static/'
-
-
 def get_displacy(mmif: Mmif):
     return displacy_dict_to_ent_html(mmif_to_displacy_dict(mmif))
 
