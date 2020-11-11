@@ -6,15 +6,13 @@ from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
 
 
-# This is where the documents live.
-# TODO: this is somewhat inconsistent with app.py
-PATH_PREFIX = '/mmif-viz/static/'
+# Changed because it does not work for appliances
 PATH_PREFIX = 'static'
+PATH_PREFIX = ''
 
 
-def XXX_get_displacy(mmif: Mmif):
-    displacy_dict = mmif_to_dict(mmif)
-    return dict_to_html(displacy_dict)
+def get_displacy(mmif: Mmif):
+    return displacy_dict_to_ent_html(mmif_to_displacy_dict(mmif))
 
 
 def visualize_ner(mmif: Mmif, view: View, document_id: str) -> str:

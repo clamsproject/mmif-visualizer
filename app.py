@@ -13,12 +13,8 @@ from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
 
 
-app = Flask(__name__)
-
-
-# This is where the applicaiton looks for files, it should be a symbolic link to
-# /mmif-viz/static
-PATH_PREFIX = 'static'
+# these two static folder-related params are very important
+app = Flask(__name__, static_folder='static', static_url_path='')
 
 
 def view_to_vtt(alignment_view):
@@ -230,4 +226,4 @@ def hello_world():
 
 if __name__ == '__main__':
     # TODO (krim @ 10/1/19): parameterize port number
-    app.run(port=5000, host='0.0.0.0', debug=True)
+    app.run(port=9002, host='0.0.0.0', debug=True)
