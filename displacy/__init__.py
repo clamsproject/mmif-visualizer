@@ -21,7 +21,6 @@ def entity_dict(mmif, view, document_id):
     that the view's entities all refer to the same document."""
     doc_idx = get_text_documents(mmif)
     doc = doc_idx.get(document_id)
-    #print('>>> doc', doc)
     text = read_text(doc)
     displacy_dict = {}
     displacy_dict['title'] = None
@@ -51,7 +50,6 @@ def read_text(textdoc):
     # TODO: this was adapted from the spacy app, should be in mmif (check that)
     if textdoc.location:
         location = textdoc.location
-        #print('>>> loc', location)
         with open(location) as fh:
             text = fh.read()
     else:

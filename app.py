@@ -23,8 +23,9 @@ def view_to_vtt(alignment_view):
 
 
 def get_alignments(alignment_view):
-    # TODO: maybe just use a string buffer
     vtt_file = tempfile.NamedTemporaryFile('w', dir="static/", suffix='.vtt', delete=False)
+    vtt_file.write("WEBVTT\n\n")
+    vtt_file.write('1000 --> 10000\ntrying out the subtitles\n\n')
     for annotation in alignment_view.annotations:
         if annotation.at_type == "vanilla-forced-alignment":
             # VTT specifically requires timestamps expressed in miliseconds
@@ -38,8 +39,6 @@ def get_alignments(alignment_view):
 
 
 def html_video(vpath, vtt_srcview=None):
-    # TODO: may not need vtt_srcview since we now put that in a tab
-    #print('>>> vid', vpath)
     sources = f'<source src=\"{vpath}\"> '
     if vtt_srcview is not None:
         vtt_path = view_to_vtt(vtt_srcview)
@@ -118,7 +117,9 @@ def display_mmif(mmif_str):
         if doc_type == 'Text':
             found_media.append(('Text', html_text(doc_path)))
         elif doc_type == 'Video':
-            found_media.append(("Video", html_video(doc_path)))
+            fa_views = get_alignment_views(mmif)
+            fa_view = fa_views[0] if fa_views else None
+            found_media.append(("Video", html_video(doc_path, fa_view)))
         elif doc_type == 'Audio':
             found_media.append(("Audio", html_audio(doc_path)))
         elif doc_type == 'Image':
@@ -147,7 +148,6 @@ def prep_annotations(mmif):
         vtt_file = view_to_vtt(fa_view)
         tabs.append(("WEBVTT", '<pre>' + open(vtt_file).read() + '</pre>'))
     for ner_view in get_ner_views(mmif):
-        #print('>>>', ner_view.id, ner_view.metadata.contains)
         visualization = create_ner_visualization(mmif, ner_view)
         tabs.append(("Entities-%s" % ner_view.id, visualization))
     return tabs
@@ -157,11 +157,23 @@ def create_ner_visualization(mmif, view):
     metadata = view.metadata.contains.get(Uri.NE)
     try:
         # all the view's named entities refer to the same text document (kaldi)
-        document_id = metadata['document']
-        return displacy.visualize_ner(mmif, view, document_id)
+        document_ids = get_document_ids(view, Uri.NE)
+        return displacy.visualize_ner(mmif, view, document_ids[0])
     except KeyError:
         # the view's entities refer to more than one text document (tessearct)
         pass
+
+
+def get_document_ids(view, annotation_type):
+    metadata = view.metadata.contains.get(annotation_type)
+    ids = set([metadata['document']]) if 'document' in metadata else set()
+    for annotation in view.annotations:
+        if annotation.at_type.endswith(annotation_type):
+            try:
+                ids.add(annotation.properties["document"])
+            except KeyError:
+                pass
+    return list(ids)
 
 
 def get_alignment_views(mmif):
