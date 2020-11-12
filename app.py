@@ -150,7 +150,7 @@ def display_mmif(mmif_str):
         elif doc_type == 'Video':
             fa_views = get_alignment_views(mmif)
             fa_view = fa_views[0] if fa_views else None
-            found_media.append(("Video", html_video(doc_path, fa_view)))
+            found_media.insert(0, ("Video", html_video(doc_path, fa_view)))
         elif doc_type == 'Audio':
             found_media.append(("Audio", html_audio(doc_path)))
         elif doc_type == 'Image':
