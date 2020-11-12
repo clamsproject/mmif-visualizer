@@ -32,6 +32,8 @@ def get_alignments(alignment_view):
     token_idx = {a.id:a for a in annotations if a.at_type.endswith('Token')}
     timeframe_idx = {a.id:a for a in annotations if a.at_type.endswith('TimeFrame')}
     alignments = [a for a in annotations if a.at_type.endswith('Alignment')]
+    vtt_start = None
+    texts = []
     for alignment in alignments:
         start_end_text = build_alignment(alignment, token_idx, timeframe_idx)
         if start_end_text is not None:
@@ -43,9 +45,14 @@ def get_alignments(alignment_view):
             # ISO format can have up to 6 below the decimal point, on the other hand
             # Assuming here that start and end are in miliseconds
             start, end, text = start_end_text
-            start = f'{start // 60000:02d}:{start % 60000 // 1000}.{start % 1000:03d}'
-            end = f'{end // 60000:02d}:{end % 60000 // 1000}.{end % 1000:03d}'
-            vtt_file.write(f'{start} --> {end}\n{text}\n\n')
+            if not vtt_start:
+                vtt_start = f'{start // 60000:02d}:{start % 60000 // 1000}.{start % 1000:03d}'
+            texts.append(text)
+            if len(texts) > 8:
+                vtt_end = f'{end // 60000:02d}:{end % 60000 // 1000}.{end % 1000:03d}'
+                vtt_file.write(f'{vtt_start} --> {vtt_end}\n{" ".join(texts)}\n\n')
+                vtt_start = None
+                texts = []
     return vtt_file
 
 
