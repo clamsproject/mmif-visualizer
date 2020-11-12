@@ -36,9 +36,15 @@ def get_alignments(alignment_view):
         start_end_text = build_alignment(alignment, token_idx, timeframe_idx)
         if start_end_text is not None:
             # VTT specifically requires timestamps expressed in miliseconds
+            # and must be be in one of these formats 
+            # mm:ss.ttt
+            # hh:mm:ss.ttt
+            # (https://developer.mozilla.org/en-US/docs/Web/API/WebVTT_API)
             # ISO format can have up to 6 below the decimal point, on the other hand
             # Assuming here that start and end are in miliseconds
             start, end, text = start_end_text
+            start = f'{start // 60000:02d}:{start % 60000 // 1000}.{start % 1000:03d}'
+            end = f'{end // 60000:02d}:{end % 60000 // 1000}.{end % 1000:03d}'
             vtt_file.write(f'{start} --> {end}\n{text}\n\n')
     return vtt_file
 
@@ -59,7 +65,8 @@ def html_video(vpath, vtt_srcview=None):
     sources = f'<source src=\"{vpath}\"> '
     if vtt_srcview is not None:
         vtt_path = view_to_vtt(vtt_srcview)
-        sources += f'<track kind="subtitles" srclang="en" src="{vtt_path}" default> '
+        # use only basename because "static" directory is mapped to '' route by `static_url_path` param
+        sources += f'<track kind="subtitles" srclang="en" src="{os.path.basename(vtt_path)}" default> '
     return f"<video controls> {sources} </video>"
 
 
