@@ -264,4 +264,4 @@ def hello_world():
 
 if __name__ == '__main__':
     # TODO (krim @ 10/1/19): parameterize port number
-    app.run(port=9002, host='0.0.0.0', debug=True)
+    app.run(port=5000, host='0.0.0.0', debug=True)
