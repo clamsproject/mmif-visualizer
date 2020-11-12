@@ -32,14 +32,27 @@ def get_alignments(alignment_view):
     token_idx = {a.id:a for a in annotations if a.at_type.endswith('Token')}
     timeframe_idx = {a.id:a for a in annotations if a.at_type.endswith('TimeFrame')}
     alignments = [a for a in annotations if a.at_type.endswith('Alignment')]
+    vtt_start = None
+    texts = []
     for alignment in alignments:
         start_end_text = build_alignment(alignment, token_idx, timeframe_idx)
         if start_end_text is not None:
             # VTT specifically requires timestamps expressed in miliseconds
+            # and must be be in one of these formats 
+            # mm:ss.ttt
+            # hh:mm:ss.ttt
+            # (https://developer.mozilla.org/en-US/docs/Web/API/WebVTT_API)
             # ISO format can have up to 6 below the decimal point, on the other hand
             # Assuming here that start and end are in miliseconds
             start, end, text = start_end_text
-            vtt_file.write(f'{start} --> {end}\n{text}\n\n')
+            if not vtt_start:
+                vtt_start = f'{start // 60000:02d}:{start % 60000 // 1000}.{start % 1000:03d}'
+            texts.append(text)
+            if len(texts) > 8:
+                vtt_end = f'{end // 60000:02d}:{end % 60000 // 1000}.{end % 1000:03d}'
+                vtt_file.write(f'{vtt_start} --> {vtt_end}\n{" ".join(texts)}\n\n')
+                vtt_start = None
+                texts = []
     return vtt_file
 
 
@@ -59,7 +72,8 @@ def html_video(vpath, vtt_srcview=None):
     sources = f'<source src=\"{vpath}\"> '
     if vtt_srcview is not None:
         vtt_path = view_to_vtt(vtt_srcview)
-        sources += f'<track kind="subtitles" srclang="en" src="{vtt_path}" default> '
+        # use only basename because "static" directory is mapped to '' route by `static_url_path` param
+        sources += f'<track kind="subtitles" srclang="en" src="{os.path.basename(vtt_path)}" default> '
     return f"<video controls> {sources} </video>"
 
 
@@ -136,7 +150,7 @@ def display_mmif(mmif_str):
         elif doc_type == 'Video':
             fa_views = get_alignment_views(mmif)
             fa_view = fa_views[0] if fa_views else None
-            found_media.append(("Video", html_video(doc_path, fa_view)))
+            found_media.insert(0, ("Video", html_video(doc_path, fa_view)))
         elif doc_type == 'Audio':
             found_media.append(("Audio", html_audio(doc_path)))
         elif doc_type == 'Image':
