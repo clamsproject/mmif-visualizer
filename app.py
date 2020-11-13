@@ -221,10 +221,10 @@ def create_ocr_visualization(mmif, view):
             if anno.at_type.endswith('TextDocument'):
                 # TODO: this is a hack because the text documents do not have a text
                 # field, instead they have an @value field
-                # NOTE: create an issue on how to get properties
                 t = str(anno.properties).split('"id":')
-                if len(t) == 2 and t[0].startswith('{"@value'):
-                    t = t[0][12:-9].strip()
+                t = anno.properties['_value']
+                t = ' '.join(t.split()).strip()
+                if t:
                     text += t + '\n'
         except:
             pass
