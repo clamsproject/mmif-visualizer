@@ -175,8 +175,52 @@
 			"end": 214,
 			"category": "PERSON"
 		    }
+		},
+		{
+		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
+		    "properties": {
+			"id": "ne6",
+			"start": 222,
+			"end": 234,
+			"category": "PERSON"
+		    }
+		},
+		{
+		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
+		    "properties": {
+			"id": "ne7",
+			"start": 359,
+			"end": 372,
+			"category": "PERSON"
+		    }
+		},
+		{
+		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
+		    "properties": {
+			"id": "ne8",
+			"start": 481,
+			"end": 488,
+			"category": "PERSON"
+		    }
+		},
+		{
+		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
+		    "properties": {
+			"id": "ne9",
+			"start": 500,
+			"end": 508,
+			"category": "PERSON"
+		    }
+		},
+		{
+		    "@type": "http://vocab.lappsgrid.org/NamedEntity",
+		    "properties": {
+			"id": "ne10",
+			"start": 622,
+			"end": 630,
+			"category": "DATE"
+		    }
 		}
-		
 	    ]
 	},
 
@@ -217,7 +261,7 @@
 			"id": "ne1",
 			"start": 5,
 			"end": 15,
-			"category": "Person"
+			"category": "PERSON"
 		    }
 		},
 		{
@@ -226,7 +270,7 @@
 			"id": "ne2",
 			"start": 19,
 			"end": 25,
-			"category": "Location"
+			"category": "GPE"
 		    }
 		}
 	    ]

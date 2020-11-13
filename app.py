@@ -111,7 +111,7 @@ def html_img(ipath, overlay_annotation=None):
                             canvas.height = imgHeight;
                             canvas.width = imgWidth;
                             context.drawImage(imageObj, 0, 0, imageObj.naturalWidth, imageObj.naturalHeight, 0,0, imgWidth, imgHeight);
-                                                    context.beginPath();
+                            context.beginPath();
                             context.lineWidth = "4";
                             context.strokeStyle = "green";
                             context.scale(scale, scale);
@@ -155,7 +155,7 @@ def display_mmif(mmif_str):
             found_media.append(("Audio", html_audio(doc_path)))
         elif doc_type == 'Image':
             # TODO: this is broken now
-            tboxes = mmif.get_view_contains(AnnotationTypes.TBOX)
+            tboxes = mmif.get_view_contains(AnnotationTypes.BoundingBox)
             found_media.append(("Image", html_img(doc_path, tboxes)))
     annotations = prep_annotations(mmif)
     return render_template('player_page.html',
@@ -184,8 +184,19 @@ def prep_annotations(mmif):
     ner_views = get_ner_views(mmif)
     use_id = True if len(ner_views) > 1 else False
     for ner_view in ner_views:
+        if not ner_view.annotations:
+            continue
         visualization = create_ner_visualization(mmif, ner_view)
         tabname = "Entities-%s" % ner_view.id if use_id else "Entities"
+        tabs.append((tabname, visualization))
+    # TODO: somewhat hackish
+    ocr_views = get_ocr_views(mmif)
+    use_id = True if len(ocr_views) > 1 else False
+    for ocr_view in ocr_views:
+        if not ocr_view.annotations:
+            continue
+        visualization = create_ocr_visualization(mmif, ocr_view)
+        tabname = "OCR-%s" % ocr_view.id if use_id else "OCR"
         tabs.append((tabname, visualization))
     return tabs
 
@@ -199,6 +210,25 @@ def create_ner_visualization(mmif, view):
     except KeyError:
         # the view's entities refer to more than one text document (tessearct)
         pass
+
+
+def create_ocr_visualization(mmif, view):
+    # TODO: the text boxes had no timePoint so I could not create a VTT
+    # TODO: no app in the metadata
+    text = '<pre>'
+    for anno in view.annotations:
+        try:
+            if anno.at_type.endswith('TextDocument'):
+                # TODO: this is a hack because the text documents do not have a text
+                # field, instead they have an @value field
+                # NOTE: create an issue on how to get properties
+                t = str(anno.properties).split('"id":')
+                if len(t) == 2 and t[0].startswith('{"@value'):
+                    t = t[0][12:-9].strip()
+                    text += t + '\n'
+        except:
+            pass
+    return text + '</pre>'
 
 
 def get_document_ids(view, annotation_type):
@@ -223,6 +253,18 @@ def get_alignment_views(mmif):
         annotation_types = view.metadata.contains.keys()
         annotation_types = [os.path.split(at)[-1] for at in annotation_types]
         if needed_types.issubset(annotation_types):
+            views.append(view)
+    return views
+
+
+def get_ocr_views(mmif):
+    views = []
+    needed_types = set([
+        "http://mmif.clams.ai/0.2.1/vocabulary/TextDocument",
+        "http://mmif.clams.ai/0.2.1/vocabulary/Alignment" ])
+    for view in mmif.views:
+        annotation_types = view.metadata.contains.keys()
+        if needed_types.issubset(annotation_types) and len(annotation_types) == 2:
             views.append(view)
     return views
 
