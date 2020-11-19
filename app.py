@@ -111,7 +111,7 @@ def html_img(ipath, overlay_annotation=None):
                             canvas.height = imgHeight;
                             canvas.width = imgWidth;
                             context.drawImage(imageObj, 0, 0, imageObj.naturalWidth, imageObj.naturalHeight, 0,0, imgWidth, imgHeight);
-                                                    context.beginPath();
+                            context.beginPath();
                             context.lineWidth = "4";
                             context.strokeStyle = "green";
                             context.scale(scale, scale);
@@ -155,7 +155,7 @@ def display_mmif(mmif_str):
             found_media.append(("Audio", html_audio(doc_path)))
         elif doc_type == 'Image':
             # TODO: this is broken now
-            tboxes = mmif.get_view_contains(AnnotationTypes.TBOX)
+            tboxes = mmif.get_view_contains(AnnotationTypes.BoundingBox)
             found_media.append(("Image", html_img(doc_path, tboxes)))
     annotations = prep_annotations(mmif)
     return render_template('player_page.html',
