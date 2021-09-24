@@ -1,3 +1,5 @@
+import os
+
 from spacy import displacy
 
 from mmif.serialize import *
@@ -50,6 +52,9 @@ def read_text(textdoc):
     # TODO: this was adapted from the spacy app, should be in mmif (check that)
     if textdoc.location:
         location = textdoc.location
+        # TODO: this is a horrbile hack, see the comment in ../app.py
+        if not os.path.isfile(location):
+            location = os.path.join(os.getcwd(), 'static', location[1:])
         with open(location) as fh:
             text = fh.read()
     else:

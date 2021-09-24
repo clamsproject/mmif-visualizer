@@ -8,21 +8,21 @@
 	    "@type": "VideoDocument",
 	    "properties": {
 		"id": "d0",
-		"location": "/var/archive/video/cpb-aacip-507-z31ng4hp5t.part.mp4"
+		"location": "/data/video/cpb-aacip-507-z31ng4hp5t.part.mp4"
 	    }
 	},
 	{
 	    "@type": "AudioDocument",
 	    "properties": {
 		"id": "d2",
-		"location": "/var/archive/audio/cpb-aacip-507-z31ng4hp5t.part.wav"
+		"location": "/data/audio/cpb-aacip-507-z31ng4hp5t.part.wav"
 	    }
 	},
 	{
 	    "@type": "TextDocument",
 	    "properties": {
 		"id": "d1",
-		"location": "/var/archive/text/cpb-aacip-507-z31ng4hp5t.part.trn"
+		"location": "/data/text/cpb-aacip-507-z31ng4hp5t.part.trn"
 	    }
 	}
     ],

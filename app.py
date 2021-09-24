@@ -1,5 +1,7 @@
 import json
 import os
+import secrets
+
 import displacy
 import requests
 import tempfile
@@ -78,6 +80,13 @@ def html_video(vpath, vtt_srcview=None):
 
 
 def html_text(tpath):
+    # TODO: this is a horrbile hack to fix a problem with running this from
+    # my local machine, where "/data/text/..." would not be available, but
+    # glueing on the working directory plus the static dir would work. Same
+    # problem occurs in displacy/__init__.py.
+    if not os.path.isfile(tpath):
+        tpath = os.path.join(os.getcwd(), 'static', tpath[1:])
+    print('>>>', tpath)
     with open(tpath) as t_file:
         return f"<pre width=\"100%\">\n{t_file.read()}\n</pre>"
 
@@ -145,6 +154,7 @@ def display_mmif(mmif_str):
     for document in mmif.documents:
         doc_type = get_document_type_short_form(document)
         doc_path = document.location
+        print('>>>', doc_path)
         if doc_type == 'Text':
             found_media.append(('Text', html_text(doc_path)))
         elif doc_type == 'Video':
@@ -244,9 +254,8 @@ def get_document_ids(view, annotation_type):
 
 
 def get_alignment_views(mmif):
-    # TODO:
-    # - (krim @ 11/8/19): not just `FA` but for more robust recognition
-    #   of text-time alignment types
+    """Return alignment views which have at least TextDocument, Token, TimeFrame and
+    Alignment annotations."""
     views = []
     needed_types = set(['TextDocument', 'Token', 'TimeFrame', 'Alignment'])
     for view in mmif.views:
@@ -258,7 +267,10 @@ def get_alignment_views(mmif):
 
 
 def get_ocr_views(mmif):
+    """Return OCR views, which have TextDocument and Alignment annotations, but no
+    other annotations."""
     views = []
+    # TODO: not sure why we use the full URL
     needed_types = set([
         "http://mmif.clams.ai/0.2.1/vocabulary/TextDocument",
         "http://mmif.clams.ai/0.2.1/vocabulary/Alignment" ])
@@ -287,30 +299,25 @@ def upload_display(filename):
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
+    # NOTE. uses of flash() originally gaven a RuntimeError (The session is
+    # unavailable because no secret key was set).  This was solved in the
+    # __main__ block by setting a key.
     if request.method == 'POST':
         # check if the post request has the file part
         if 'file' not in request.files:
-            flash('No file part')
+            flash('WARNING: no file part')
             return redirect(request.url)
         file = request.files['file']
         # if user does not select file, browser also
         # submit an empty part without filename
         if file.filename == '':
-            flash('No selected file')
+            flash('WARNING: no file selected')
             return redirect(request.url)
         if file:
             filename = secure_filename(file.filename)
             file.save(os.path.join('temp', filename))
             return upload_display(filename)
-    return '''
-    <!doctype html>
-    <title>Upload new File</title>
-    <h1>Upload new File</h1>
-    <form method=post enctype=multipart/form-data>
-      <input type=file name=file>
-      <input type=submit value=Upload>
-    </form> 
-    '''
+    return render_template('upload_file.html')
 
 
 @app.route('/')
@@ -319,5 +326,10 @@ def hello_world():
 
 
 if __name__ == '__main__':
+
+    # to avoid runtime errors for missing keys when using flash()
+    alphabet = 'abcdefghijklmnopqrstuvwxyz1234567890'
+    app.secret_key = ''.join(secrets.choice(alphabet) for i in range(36))
+
     # TODO (krim @ 10/1/19): parameterize port number
     app.run(port=5000, host='0.0.0.0', debug=True)
