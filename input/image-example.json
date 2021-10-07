@@ -29,7 +29,7 @@
           "@type": "http://mmif.clams.ai/0.2.1/vocabulary/BoundingBox",
           "properties": {
             "id": "bb1",
-            "coordinates": [ [10, 20], [40, 20], [10, 30], [40, 30] ],
+            "coordinates": [ [5, 120], [50, 120], [5, 200], [50, 200] ],
             "boxType": "text"
           }
         },
@@ -37,7 +37,7 @@
           "@type": "http://mmif.clams.ai/0.2.1/vocabulary/BoundingBox",
           "properties": {
             "id": "bb2",
-            "coordinates": [ [210, 220], [240, 220], [210, 230], [240, 230] ],
+            "coordinates": [ [110, 10], [260, 10], [110, 220], [260, 220] ],
             "boxType": "text"
           }
         }

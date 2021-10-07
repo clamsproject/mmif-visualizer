@@ -1,6 +1,9 @@
-import json
 import os
+import sys
+import json
 import secrets
+
+from string import Template
 
 import displacy
 import requests
@@ -9,14 +12,54 @@ import tempfile
 from flask import Flask, request, render_template, flash, redirect
 from werkzeug.utils import secure_filename
 
-from mmif.serialize import *
+from mmif.serialize import Mmif, View
 from mmif.vocabulary import AnnotationTypes
 from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
 
 
-# these two static folder-related params are very important
+# these two static folder-related params are important, do not remove
 app = Flask(__name__, static_folder='static', static_url_path='')
+
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+@app.route('/upload', methods=['GET', 'POST'])
+def upload():
+    # NOTE. Uses of flash() originally gaven a RuntimeError (The session is
+    # unavailable because no secret key was set). This was solved in the
+    # __main__ block by setting a key.
+    if request.method == 'POST':
+        # check if the post request has the file part
+        if 'file' not in request.files:
+            flash('WARNING: post request has no file part')
+            return redirect(request.url)
+        file = request.files['file']
+        # if user does not select file, browser also
+        # submit an empty part without filename
+        if file.filename == '':
+            flash('WARNING: no file was selected')
+            return redirect(request.url)
+        if file:
+            filename = secure_filename(file.filename)
+            file.save(os.path.join('temp', filename))
+            with open("temp/" + filename) as fh:
+                mmif_str = fh.read()
+                return render_mmif(mmif_str)
+    return render_template('upload.html')
+
+
+def render_mmif(mmif_str):
+    mmif = Mmif(mmif_str)
+    found_media = get_media(mmif)
+    annotations = prep_annotations(mmif)
+    return render_template('player.html',
+                           mmif=mmif,
+                           media=found_media,
+                           annotations=annotations)
 
 
 def view_to_vtt(alignment_view):
@@ -80,76 +123,34 @@ def html_video(vpath, vtt_srcview=None):
 
 
 def html_text(tpath):
-    # TODO: this is a horrbile hack to fix a problem with running this from
-    # my local machine, where "/data/text/..." would not be available, but
-    # glueing on the working directory plus the static dir would work. Same
-    # problem occurs in displacy/__init__.py.
+    # TODO. This is a hack to fix a problem with running this from my local
+    # machine, where "/data/text/..." would not be available, but glueing on the
+    # working directory plus the static dir would work. The same problem occurs
+    # in displacy/__init__.py.
     if not os.path.isfile(tpath):
         tpath = os.path.join(os.getcwd(), 'static', tpath[1:])
-    print('>>>', tpath)
+    #print('>>>', tpath)
     with open(tpath) as t_file:
         return f"<pre width=\"100%\">\n{t_file.read()}\n</pre>"
 
 
-def html_img(ipath, overlay_annotation=None):
-    return f""" <canvas id="imgCanvas" width="350" height="1000"></canvas>
-                    <script>
-                        var ann_view = {overlay_annotation if overlay_annotation is not None else {{"annotations: []"}}}
-                        var canvas = document.getElementById('imgCanvas');
-                        var context = canvas.getContext('2d');
-                        var imageObj = new Image();
-                        imageObj.src = '{ipath}';
-                        imageObj.onload = function() {{
-                            var imgWidth = imageObj.naturalWidth;
-                            var screenWidth  = canvas.width;
-                            var scaleX = 1;
-                            if (imgWidth > screenWidth)
-                                scaleX = screenWidth/imgWidth;
-                            var imgHeight = imageObj.naturalHeight;
-                            var screenHeight = canvas.height;
-                            var scaleY = 1;
-                            if (imgHeight > screenHeight)
-                                scaleY = screenHeight/imgHeight;
-                            var scale = scaleY;
-                            if(scaleX < scaleY)
-                                scale = scaleX;
-                            if(scale < 1){{
-                                imgHeight = imgHeight*scale;
-                                imgWidth = imgWidth*scale;
-                            }}
-                            canvas.height = imgHeight;
-                            canvas.width = imgWidth;
-                            context.drawImage(imageObj, 0, 0, imageObj.naturalWidth, imageObj.naturalHeight, 0,0, imgWidth, imgHeight);
-                            context.beginPath();
-                            context.lineWidth = "4";
-                            context.strokeStyle = "green";
-                            context.scale(scale, scale);
-                            for (var i=0; i < ann_view["annotations"].length; i++){{
-                                var box = ann_view["annotations"][i];
-                                var coord = (box["feature"]["box"]);
-                                x = coord[0];
-                                y = coord[1];
-                                w = coord[2] - coord[0];
-                                h = coord[3] - coord[1];
-                                context.rect(x, y, w, h);
-                            }}
-                            context.stroke();
-                        }}
-                    </script>"""
+def html_img(ipath, annotations=None):
+    annotations = [] if annotations is None else annotations
+    t = Template(open('templates/image.html').read())
+    s = t.substitute(filename=ipath, annotations=annotations)
+    return s
 
 
 def html_audio(apath):
     return f"<audio controls src={apath}></audio>"
 
 
-def display_mmif(mmif_str):
-    """Return the MMIF string rendered as an HTML document."""
+def get_media(mmif):
     # TODO: the order in this list decides the default view in the display
     # (which is the first one), this used to be done specifically by adding the
     # video first, but it is now determined by the order in the documents list
     # in the MMIF object. May need to change that if the video is not the first
     # one in the MMIF file.
-    mmif = Mmif(mmif_str)
     found_media = []
     for document in mmif.documents:
         doc_type = get_document_type_short_form(document)
@@ -164,14 +165,13 @@ def display_mmif(mmif_str):
         elif doc_type == 'Audio':
             found_media.append(("Audio", html_audio(doc_path)))
         elif doc_type == 'Image':
-            # TODO: this is broken now
-            tboxes = mmif.get_view_contains(AnnotationTypes.BoundingBox)
-            found_media.append(("Image", html_img(doc_path, tboxes)))
-    annotations = prep_annotations(mmif)
-    return render_template('player_page.html',
-                           mmif=mmif,
-                           media=found_media,
-                           annotations=annotations)
+            # TODO: this gives you the last view with BoundingBoxes, should
+            # perhaps use get_views_contain() instead
+            tbox_view = mmif.get_view_contains(AnnotationTypes.BoundingBox)
+            tbox_annotations = tbox_view.annotations
+            #print(type(tboxes))
+            found_media.append(("Image", html_img(doc_path, tbox_annotations)))
+    return found_media
 
 
 def get_document_type_short_form(document):
@@ -185,7 +185,7 @@ def prep_annotations(mmif):
     """Prepare annotations from the views, and return a list of pairs of tabname
     and tab content. The first tab is alway the full MMIF pretty print."""
     tabs = [("MMIF", "<pre>" + mmif.serialize(pretty=True) + "</pre>")]
-    # TODO: since this uses the same tab-name this will only hsow the same
+    # TODO: since this uses the same tab-name this will only show the same
     # stuff; it does a loop but for now we assume there is just one file with
     # alignments (generated by Kaldi)
     for fa_view in get_alignment_views(mmif):
@@ -285,44 +285,10 @@ def get_ner_views(mmif):
     return [v for v in mmif.views if Uri.NE in v.metadata.contains]
 
 
-@app.route('/display')
-def display_file():
-    mmif_str = requests.get(request.args["file"]).text
-    return display_mmif(mmif_str)
-
-
-def upload_display(filename):
-    with open("temp/" + filename) as fh:
-        mmif_str = fh.read()
-        return display_mmif(mmif_str)
-
-
-@app.route('/upload', methods=['GET', 'POST'])
-def upload_file():
-    # NOTE. uses of flash() originally gaven a RuntimeError (The session is
-    # unavailable because no secret key was set).  This was solved in the
-    # __main__ block by setting a key.
-    if request.method == 'POST':
-        # check if the post request has the file part
-        if 'file' not in request.files:
-            flash('WARNING: no file part')
-            return redirect(request.url)
-        file = request.files['file']
-        # if user does not select file, browser also
-        # submit an empty part without filename
-        if file.filename == '':
-            flash('WARNING: no file selected')
-            return redirect(request.url)
-        if file:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join('temp', filename))
-            return upload_display(filename)
-    return render_template('upload_file.html')
-
-
-@app.route('/')
-def hello_world():
-    return 'Hello World!'
+# Not sure what this was for, it had a route /display, but that did not work
+# def display_file():
+#    mmif_str = requests.get(request.args["file"]).text
+#    return display_mmif(mmif_str)
 
 
 if __name__ == '__main__':
@@ -331,5 +297,7 @@ if __name__ == '__main__':
     alphabet = 'abcdefghijklmnopqrstuvwxyz1234567890'
     app.secret_key = ''.join(secrets.choice(alphabet) for i in range(36))
 
-    # TODO (krim @ 10/1/19): parameterize port number
-    app.run(port=5000, host='0.0.0.0', debug=True)
+    port = 5000
+    if len(sys.argv) > 2 and sys.argv[1] == '-p':
+        port = int(sys.argv[2])
+    app.run(port=port, host='0.0.0.0', debug=True)

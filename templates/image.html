@@ -1,0 +1,58 @@
+<canvas id="imgCanvas" width="350" height="1000"></canvas>
+
+<script>	
+
+var annotations = $annotations
+
+var canvas = document.getElementById('imgCanvas');
+var context = canvas.getContext('2d');
+var imageObj = new Image();
+
+imageObj.src = '$filename';
+
+imageObj.onload = function() {
+    
+    var imgWidth = imageObj.naturalWidth;
+    var imgHeight = imageObj.naturalHeight;
+    var screenWidth  = canvas.width;
+    var screenHeight = canvas.height;
+    var scaleX = 1;
+    var scaleY = 1;
+
+    if (imgWidth > screenWidth)
+	scaleX = screenWidth/imgWidth;
+    if (imgHeight > screenHeight)
+        scaleY = screenHeight/imgHeight;
+
+    var scale = scaleY;
+
+    if (scaleX < scaleY)
+        scale = scaleX;
+    if (scale < 1) {
+        imgHeight = imgHeight*scale;
+        imgWidth = imgWidth*scale; }
+
+    canvas.height = imgHeight;
+    canvas.width = imgWidth;
+    context.drawImage(imageObj, 0, 0,
+		      imageObj.naturalWidth, imageObj.naturalHeight, 0,0,
+		      imgWidth, imgHeight);
+    context.beginPath();
+    context.lineWidth = "4";
+    context.strokeStyle = "blue";
+    context.scale(scale, scale);
+
+    for (var i=0; i < annotations.length; i++) {
+        var coord = annotations[i]["properties"]["coordinates"];
+	// [[10, 20], [40, 20], [10, 30], [40, 30]]
+	// [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
+	// [left-top, right-top, left-bottom, right-bottom]
+        x = coord[0][0];
+        y = coord[0][1];
+        w = coord[1][0] - x
+        h = coord[2][1] - y
+        context.rect(x, y, w, h);
+    }
+    context.stroke();
+}
+</script>
