@@ -1,0 +1,5 @@
+static/tmp*
+*~
+__pycache__
+.git
+.gitignore

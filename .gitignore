@@ -72,5 +72,5 @@ tags
 .tags
 
 # static archival files
-static/*
+static/tmp*
 

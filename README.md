@@ -1,37 +1,104 @@
-# MMIF Visualization 
+# The MMIF Visualization Server
 
-This web app visualizes different annotation component in a single MMIF file. For details of MMIF format, please refer to the [MMIF website](https://mmif.clams.ai). 
+This web application creates an HTML server that visualizes different annotation components in a [MMIF](https://mmif.clams.ai) file. Supported annotations are:
 
-## Supported annotation
+- Video or Audio file player with HTML5
+- [WebVTT](https://www.w3.org/TR/webvtt1/)
+- Raw and pretty-printed MMIF contents
+- Named entity annotations with [displaCy](https://explosion.ai/demos/displacy-ent)
 
-1. Video or Audio file player via HTML5
-1. raw and pretty-printed MMIF contents (MMIF is syntactically JSON)
-1. NE annotations via [displaCy](https://explosion.ai/demos/displacy-ent)
+Requirements:
 
-## Installation 
+- Python 3.6 or later
 
-## via Docker 
+- Git command line interface (to get the code)
 
-Running via [docker](https://www.docker.com/) is preferred way. Download or clone this repository and build a image using `Dockerfile`. Once the image is ready, run it with container port 5000 is exposed (`-p XXXX:5000`) and data repository is mounted inside `/app/static` directory of the container. See the last section for more details on data repository.  
+- [Docker](https://www.docker.com/)  (if you run the visualizer using Docker)
 
-## Native installation
+To get this code if you don't already have it:
 
-### Requirements
+```bash
+$ git clone https://github.com/clamsproject/mmif-visualizer
+```
 
-1. Python 3.6 or later
-1. git command line interface
 
-### Instruction
-Simply clone this repository and install python dependencies listed in `requirements.txt`. Copy, symlink, or mount your primary data source into `static` directory. See next section for more details. 
 
-And then copy (or symlink/mount) your primary data source into `static` directory. 
+## Running and using the server in a Docker container
 
-There is an example input file in `input`, this file refers to two file paths:
+Download or clone this repository and build an image using the `Dockerfile` (you may use another name for the -t parameter, for this example we use `clams-mmif-visualizer` throughout).
+
+```bash
+$ git clone https://github.com/clamsproject/mmif-visualizer
+$ docker build -t clams-mmif-visualizer .
+```
+
+In these notes we assume that the data are in a local directory named `/Users/Shared/archive` with sub directories `audio`, `image`, `text` and`video` (those subdirectories are standard in CLAMS, but the parent directory could be any directory depending on your local set up). We can now run a Docker container with
+
+```bash
+$ docker run --rm -d -p 5000:5000 -v /Users/Shared/archive:/data clams-mmif-visualizer
+```
+
+After this, all you need to do is point your browser at [http://0.0.0.0:5000/upload](http://0.0.0.0:5000/upload), click "Choose File", select a MMIF file and then click "Visualize". See the *Data source repository and input MMIF file* section below for a description of the MMIF file. Assuming you have not made any changes to the directory structure you can use the example MMIF files in the `input` folder.
+
+**Some background**
+
+With the docker command above we do two things of note:
+
+1. The container port 5000 (the default for a Flask server) is exposed to the same port on your Docker host (your local computer) with the `-p` option.
+2. The local data repository `/Users/Shared/archive` is mounted to `/data` on the container with the `-v` option.
+
+Another useful p[iece of information is that the Flask server on the Docker container has no direct access to `/data` since it can only see data in the `static` directory of this repository. Therefore we have created a symbolic link `static/data` that links to `/data`:
+
+```bash
+$ ln -s /data static/data
+```
+
+With this, the mounted directory `/data` in the container is accessable from inside the `/app/static` directory of the container. You do not need to use this command unless you change your set up because the symbolic link is part of this repository. 
+
+
+
+## Running and using a server without Docker
+
+First install the python dependencies listed in `requirements.txt`:
+
+````bash
+$ pip install -r requirements.txt
+````
+
+Let's again assume that the data are in a local directory `/Users/Shared/archive` with sub directories `audio`, `image`, `text` and`video`. You need to copy, symlink, or mount that local directory into the `static` directory. Note that the `static/data` symbolic link that is in the repository is set up to work with the docker containers, if you keep it in that form your data need to be in `/data`, otherwise you need to chamge the link to fit your needs, for example, you could remove the symbolic link and replace it with one that uses your local directory:
+
+```bash
+$ rm static/data
+$ ln -s /Users/Shared/archive static/data
+```
+
+To run the server do:
+
+```bash
+$ python app.py
+```
+
+Then point your browser at [http://0.0.0.0:5000/upload](http://0.0.0.0:5000/upload), click "Choose File" and then click "Visualize".
+
+
+
+## Data source repository and input MMIF file
+The data source includes video, audio, and text (transcript) files that are subjects for the CLAMS analysis tools. As mentioned above, to make this visualizer work with those files and be able to display the contents on the web browser, those source files need to be accessible from inside the `static` directory.
+
+The data sources used here are copy righted and are NOT in the repository. At 
+
+The data sources are embedded in a MMIF file and it is the MMIF file that is handed to the visualizer. There is an example input MMIF file in `input/video-transcript-demux-fa.short.json`, this file refers to three media files:
 
 1. cpb-aacip-507-z31ng4hp5t.part.mp4
-2. cpb-aacip-507-z31ng4hp5t.part.trn
+2. cpb-aacip-507-z31ng4hp5t.part.wav
+3. cpb-aacip-507-z31ng4hp5t.part.trn
 
-These two paths should be in `/mmif-viz/static/archive/video` and `/mmif-viz/static/archive/text`.
+According to the MMIF file those three files should be in `/data/video` ,  `/data/audio` and `/data/text` respectively. The Flask server will look for these files in `static/data/video`, `static/data/audio` and `static/data/text`, amd those directories should point at the appropriate location:
 
-# Data source repository. 
-Data source includes video, audio, and text (transcript) files that are subjects for the CLAMS analysis tools. To make this visualizer accessible to those files and able to display the contents on the web browser, source files needs to be located inside `static` directory. For example, if the path to a source file encoded in the MMIF is `/local/path/to/data/some-video-file.mp4`, the same file must exist as `static/local/path/to/data/some-video-file.mp4`. 
+- If you run the visualizer in a Docker container, then the `-v` option in the docker-run command is used to mount the local data directory `/Users/shared/archive` to the `/data` directory on the container and the `static/data` symlink already points to that.
+- If you run the visualizer on your local machine without using a container, then you have a couple of options (where you may need to remove the current link first):
+  - Make sure that the `static/data` symlink points at the local data directory 
+    `$> ln -s /Users/Shared/archive/ static/data`
+  - Copy the contents of `/Users/Shared/archive` into `static/data`.
+  - You could choose to copy the data to any spot in the `static` folder but then you would have to edit the MMIF input file.
+

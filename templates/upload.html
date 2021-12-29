@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>MMIF Visualization</title>
+  <meta charset="utf-8">
+  <link rel="stylesheet"
+	href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+	integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+	crossorigin="anonymous">
+</head>
+
+<body>
+  <div class="panel panel-default">
+
+    <div class="card-header">
+      <h1 align="center">Upload and visualize a MMIF file</h1>
+    </div>
+
+    <div class="card-body container-fluid">
+      <div class="row">
+        <div class="col" style="border-right: 2px solid #ccc";>
+	  {% with messages = get_flashed_messages() %}
+	  {% if messages %}
+	  <div class=flashes>
+	    {% for message in messages %}
+	    <p>{{ message }}</p>
+	    {% endfor %}
+	  </div>
+	  {% endif %}
+	  {% endwith %}
+	  <form method=post enctype=multipart/form-data>
+	    <input type=file name=file><br/><br/>
+	    <input type=submit value=Visualize>
+	  </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>
+
+
+
+
+</html>

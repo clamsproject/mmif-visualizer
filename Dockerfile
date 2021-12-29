@@ -1,13 +1,11 @@
-FROM ubuntu:20.04
+FROM python:3.6-buster
 
-
-RUN apt-get update && \
-    apt-get install -y git python3 python3-pip python3-setuptools
-
-COPY ./ ./app
 WORKDIR ./app
-RUN pip3 install -r requirements.txt
 
+COPY ./requirements.txt .
 
-ENTRYPOINT ["python3"]
-CMD ["app.py"]
+RUN pip install -r requirements.txt
+
+COPY ./ ./
+
+CMD ["python", "app.py"]
