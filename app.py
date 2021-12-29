@@ -3,6 +3,7 @@ import sys
 import json
 import secrets
 
+from io import StringIO
 from string import Template
 
 import displacy
@@ -20,7 +21,6 @@ from lapps.discriminators import Uri
 
 # these two static folder-related params are important, do not remove
 app = Flask(__name__, static_folder='static', static_url_path='')
-
 
 @app.route('/')
 def index():
@@ -54,12 +54,10 @@ def upload():
 
 def render_mmif(mmif_str):
     mmif = Mmif(mmif_str)
-    found_media = get_media(mmif)
+    media = get_media(mmif)
     annotations = prep_annotations(mmif)
     return render_template('player.html',
-                           mmif=mmif,
-                           media=found_media,
-                           annotations=annotations)
+                           mmif=mmif, media=media, annotations=annotations)
 
 
 def view_to_vtt(alignment_view):
@@ -114,31 +112,36 @@ def build_alignment(alignment, token_idx, timeframe_idx):
 
 
 def html_video(vpath, vtt_srcview=None):
-    sources = f'<source src=\"{vpath}\"> '
+    html = StringIO()
+    html.write("<video controls>\n")
+    html.write(f'    <source src=\"{vpath}\">\n')
     if vtt_srcview is not None:
         vtt_path = view_to_vtt(vtt_srcview)
-        # use only basename because "static" directory is mapped to '' route by `static_url_path` param
-        sources += f'<track kind="subtitles" srclang="en" src="{os.path.basename(vtt_path)}" default> '
-    return f"<video controls> {sources} </video>"
+        # use only basename because "static" directory is mapped to '' route by
+        # `static_url_path` param
+        src = os.path.basename(vtt_path)
+        html.write(f'    <track kind="subtitles" srclang="en" src="{src}" default>\n')
+    html.write("</video>\n")
+    return html.getvalue()
 
 
 def html_text(tpath):
-    # TODO. This is a hack to fix a problem with running this from my local
-    # machine, where "/data/text/..." would not be available, but glueing on the
-    # working directory plus the static dir would work. The same problem occurs
-    # in displacy/__init__.py.
+    """Return the conent of the text document, but with some HTML tags added."""
     if not os.path.isfile(tpath):
-        tpath = os.path.join(os.getcwd(), 'static', tpath[1:])
-    #print('>>>', tpath)
+        # This is to fix a problem when running this from a local machine where
+        # /data/text may not be available (it always is available from the
+        # container). The same problem occurs in displacy/__init__.py.
+        tpath = os.path.join(app.root_path, 'static', tpath[1:])
     with open(tpath) as t_file:
-        return f"<pre width=\"100%\">\n{t_file.read()}\n</pre>"
+        #return f"<pre width=\"100%\">\n{t_file.read()}\n</pre>"
+        content = t_file.read().replace("\n", "<br/>\n")
+        return f"{content}\n"
 
 
-def html_img(ipath, annotations=None):
-    annotations = [] if annotations is None else annotations
+def html_img(ipath, boxes=None):
+    boxes = [] if boxes is None else boxes
     t = Template(open('templates/image.html').read())
-    s = t.substitute(filename=ipath, annotations=annotations)
-    return s
+    return t.substitute(filename=ipath, boxes=boxes)
 
 
 def html_audio(apath):
@@ -146,32 +149,45 @@ def html_audio(apath):
 
 
 def get_media(mmif):
-    # TODO: the order in this list decides the default view in the display
-    # (which is the first one), this used to be done specifically by adding the
-    # video first, but it is now determined by the order in the documents list
-    # in the MMIF object. May need to change that if the video is not the first
-    # one in the MMIF file.
-    found_media = []
+    # Returns a list of tuples, one for each element in the documents list of
+    # the MMIF object, following the order in that list. Each tuple has four
+    # elements: document type, document identifier, document path and the HTML
+    # visualization.
+    media = []
     for document in mmif.documents:
         doc_type = get_document_type_short_form(document)
         doc_path = document.location
         print('>>>', doc_path)
         if doc_type == 'Text':
-            found_media.append(('Text', html_text(doc_path)))
+            html = html_text(doc_path)
         elif doc_type == 'Video':
             fa_views = get_alignment_views(mmif)
             fa_view = fa_views[0] if fa_views else None
-            found_media.insert(0, ("Video", html_video(doc_path, fa_view)))
+            html = html_video(doc_path, fa_view)
         elif doc_type == 'Audio':
-            found_media.append(("Audio", html_audio(doc_path)))
+            html = html_audio(doc_path)
         elif doc_type == 'Image':
             # TODO: this gives you the last view with BoundingBoxes, should
-            # perhaps use get_views_contain() instead
+            # perhaps use get_views_contain() instead, should also select just
+            # the bounding boxes and add information from alignments to text
+            # documents
             tbox_view = mmif.get_view_contains(AnnotationTypes.BoundingBox)
             tbox_annotations = tbox_view.annotations
-            #print(type(tboxes))
-            found_media.append(("Image", html_img(doc_path, tbox_annotations)))
-    return found_media
+            # For the boxes we pull some information from the annotation: the
+            # identifier, boxType and the (x,y,w,h) coordinates used by the
+            # Javascript code that draws the rectangle.
+            boxes = []
+            for a in tbox_annotations:
+                coordinates = a.properties["coordinates"]
+                x = coordinates[0][0]
+                y = coordinates[0][1]
+                w = coordinates[1][0] - x
+                h = coordinates[2][1] - y
+                box = [a.properties["id"], a.properties["boxType"], [x, y, w, h]]
+                boxes.append(box)
+            html = html_img(doc_path, boxes)
+        media.append((doc_type, document.id, doc_path, html))
+    return media
 
 
 def get_document_type_short_form(document):
@@ -216,7 +232,7 @@ def create_ner_visualization(mmif, view):
     try:
         # all the view's named entities refer to the same text document (kaldi)
         document_ids = get_document_ids(view, Uri.NE)
-        return displacy.visualize_ner(mmif, view, document_ids[0])
+        return displacy.visualize_ner(mmif, view, document_ids[0], app.root_path)
     except KeyError:
         # the view's entities refer to more than one text document (tessearct)
         pass

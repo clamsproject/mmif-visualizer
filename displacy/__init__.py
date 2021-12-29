@@ -2,7 +2,7 @@ import os
 
 from spacy import displacy
 
-from mmif.serialize import *
+from mmif.serialize import Mmif, View, Annotation
 from mmif.vocabulary import AnnotationTypes
 from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
@@ -12,18 +12,18 @@ def get_displacy(mmif: Mmif):
     return displacy_dict_to_ent_html(mmif_to_displacy_dict(mmif))
 
 
-def visualize_ner(mmif: Mmif, view: View, document_id: str) -> str:
-    displacy_dict = entity_dict(mmif, view, document_id)
+def visualize_ner(mmif: Mmif, view: View, document_id: str, app_root: str) -> str:
+    displacy_dict = entity_dict(mmif, view, document_id, app_root)
     return dict_to_html(displacy_dict)
 
 
-def entity_dict(mmif, view, document_id):
+def entity_dict(mmif, view, document_id, app_root):
     """Create and return the displacy entity dictionary from a MMIF object. This
     dictionary is in the format that is needed by the render method. Assumes
     that the view's entities all refer to the same document."""
     doc_idx = get_text_documents(mmif)
     doc = doc_idx.get(document_id)
-    text = read_text(doc)
+    text = read_text(doc, app_root)
     displacy_dict = {}
     displacy_dict['title'] = None
     displacy_dict['text'] = text
@@ -47,14 +47,14 @@ def get_text_documents(mmif):
     return tds
 
 
-def read_text(textdoc):
+def read_text(textdoc, app_root):
     """Read the text content from the document or the text value."""
-    # TODO: this was adapted from the spacy app, should be in mmif (check that)
     if textdoc.location:
         location = textdoc.location
-        # TODO: this is a horrbile hack, see the comment in ../app.py
+        # adjust the path (possibly needed when you do not run this in a
+        # container, see the comment in html_text() in ../app.py)
         if not os.path.isfile(location):
-            location = os.path.join(os.getcwd(), 'static', location[1:])
+            location = os.path.join(app_root, 'static', location[1:])
         with open(location) as fh:
             text = fh.read()
     else:
