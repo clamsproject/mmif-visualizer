@@ -37,12 +37,12 @@ def entity_dict(mmif, view, document_id, app_root):
 def get_text_documents(mmif):
     """Return a dictionary indexed on document identifiers (with the view identifier
     if needed) with text documents as the values."""
-    tds = [d for d in mmif.documents if d.at_type.endswith('TextDocument')]
+    tds = [d for d in mmif.documents if str(d.at_type).endswith('TextDocument')]
     tds = {td.id:td for td in tds}
     for view in mmif.views:
         # TODO: add check for TextDocument in metadata.contains (saves time)
         for annotation in view.annotations:
-            if annotation.at_type.endswith('TextDocument'):
+            if str(annotation.at_type).endswith('TextDocument'):
                 tds["%s:%s" % (view.id, annotation.id)] = annotation
     return tds
 
@@ -54,7 +54,12 @@ def read_text(textdoc, app_root):
         # adjust the path (possibly needed when you do not run this in a
         # container, see the comment in html_text() in ../app.py)
         if not os.path.isfile(location):
-            location = os.path.join(app_root, 'static', location[1:])
+            if location.startswith('file:///'):
+                location = location[8:]
+            else:
+                # this should not happen anymore, but keeping it anyway
+                location = location[1:]
+            location = os.path.join(app_root, 'static', location)
         with open(location) as fh:
             text = fh.read()
     else:

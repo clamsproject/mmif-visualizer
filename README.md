@@ -1,19 +1,19 @@
 # The MMIF Visualization Server
 
-This web application creates an HTML server that visualizes different annotation components in a [MMIF](https://mmif.clams.ai) file. Supported annotations are:
+This application creates an HTML server that visualizes annotation components in a [MMIF](https://mmif.clams.ai) file. Supported annotations are:
 
-- Video or Audio file player with HTML5
-- [WebVTT](https://www.w3.org/TR/webvtt1/)
-- Raw and pretty-printed MMIF contents
-- Named entity annotations with [displaCy](https://explosion.ai/demos/displacy-ent)
+- Video or Audio file player with HTML5.
+- [WebVTT](https://www.w3.org/TR/webvtt1/) for showing alignments.
+- Pretty-printed MMIF contents.
+- Javascript for bounding boxes.
+- Named entity annotations with [displaCy.](https://explosion.ai/demos/displacy-ent)
 
 Requirements:
 
-- Python 3.6 or later
-
-- Git command line interface (to get the code)
-
-- [Docker](https://www.docker.com/)  (if you run the visualizer using Docker)
+- A command line interface.
+- Git (to get the code).
+- [Docker](https://www.docker.com/)  (if you run the visualizer using Docker).
+- Python 3.6 or later (if you want to run the server without Docker).
 
 To get this code if you don't already have it:
 
@@ -23,16 +23,15 @@ $ git clone https://github.com/clamsproject/mmif-visualizer
 
 
 
-## Running and using the server in a Docker container
+## Running the server in a Docker container
 
 Download or clone this repository and build an image using the `Dockerfile` (you may use another name for the -t parameter, for this example we use `clams-mmif-visualizer` throughout).
 
 ```bash
-$ git clone https://github.com/clamsproject/mmif-visualizer
 $ docker build -t clams-mmif-visualizer .
 ```
 
-In these notes we assume that the data are in a local directory named `/Users/Shared/archive` with sub directories `audio`, `image`, `text` and`video` (those subdirectories are standard in CLAMS, but the parent directory could be any directory depending on your local set up). We can now run a Docker container with
+In these notes we assume that the data are in a local directory named `/Users/Shared/archive` with sub directories `audio`, `image`, `text` and `video` (those subdirectories are standard in CLAMS, but the parent directory could be any directory depending on your local set up). We can now run a Docker container with
 
 ```bash
 $ docker run --rm -d -p 5000:5000 -v /Users/Shared/archive:/data clams-mmif-visualizer
@@ -47,7 +46,7 @@ With the docker command above we do two things of note:
 1. The container port 5000 (the default for a Flask server) is exposed to the same port on your Docker host (your local computer) with the `-p` option.
 2. The local data repository `/Users/Shared/archive` is mounted to `/data` on the container with the `-v` option.
 
-Another useful p[iece of information is that the Flask server on the Docker container has no direct access to `/data` since it can only see data in the `static` directory of this repository. Therefore we have created a symbolic link `static/data` that links to `/data`:
+Another useful piece of information is that the Flask server on the Docker container has no direct access to `/data` since it can only see data in the `static` directory of this repository. Therefore we have created a symbolic link `static/data` that links to `/data`:
 
 ```bash
 $ ln -s /data static/data
@@ -57,7 +56,7 @@ With this, the mounted directory `/data` in the container is accessable from ins
 
 
 
-## Running and using a server without Docker
+## Running the server without Docker
 
 First install the python dependencies listed in `requirements.txt`:
 

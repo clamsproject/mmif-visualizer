@@ -72,9 +72,9 @@ def get_alignments(alignment_view):
     annotations = alignment_view.annotations
     # TODO: wanted to use "mmif.get_alignments(AnnotationTypes.TimeFrame, Uri.TOKEN)"
     # but that gave errors so I gave up on it
-    token_idx = {a.id:a for a in annotations if a.at_type.endswith('Token')}
-    timeframe_idx = {a.id:a for a in annotations if a.at_type.endswith('TimeFrame')}
-    alignments = [a for a in annotations if a.at_type.endswith('Alignment')]
+    token_idx = {a.id:a for a in annotations if str(a.at_type).endswith('Token')}
+    timeframe_idx = {a.id:a for a in annotations if str(a.at_type).endswith('TimeFrame')}
+    alignments = [a for a in annotations if str(a.at_type).endswith('Alignment')]
     vtt_start = None
     texts = []
     for alignment in alignments:
@@ -112,6 +112,7 @@ def build_alignment(alignment, token_idx, timeframe_idx):
 
 
 def html_video(vpath, vtt_srcview=None):
+    vpath = url2posix(vpath)
     html = StringIO()
     html.write("<video controls>\n")
     html.write(f'    <source src=\"{vpath}\">\n')
@@ -131,7 +132,12 @@ def html_text(tpath):
         # This is to fix a problem when running this from a local machine where
         # /data/text may not be available (it always is available from the
         # container). The same problem occurs in displacy/__init__.py.
-        tpath = os.path.join(app.root_path, 'static', tpath[1:])
+        if tpath.startswith('file:///'):
+            tpath = tpath[8:]
+        else:
+            # this should not happen anymore, but keeping it anyway
+            tpath = tpath[1:]
+        tpath = os.path.join(app.root_path, 'static', tpath)
     with open(tpath) as t_file:
         #return f"<pre width=\"100%\">\n{t_file.read()}\n</pre>"
         content = t_file.read().replace("\n", "<br/>\n")
@@ -139,13 +145,23 @@ def html_text(tpath):
 
 
 def html_img(ipath, boxes=None):
+    ipath = url2posix(ipath)
     boxes = [] if boxes is None else boxes
     t = Template(open('templates/image.html').read())
     return t.substitute(filename=ipath, boxes=boxes)
 
 
 def html_audio(apath):
+    apath = url2posix(apath)
     return f"<audio controls src={apath}></audio>"
+
+
+def url2posix(path):
+    """For the visualizer we often want a POSIX path and not a URL so we strip off
+    the protocol if there is one."""
+    if path.startswith('file:///'):
+        path = path[7:]
+    return path
 
 
 def get_media(mmif):
@@ -171,7 +187,7 @@ def get_media(mmif):
             # perhaps use get_views_contain() instead, should also select just
             # the bounding boxes and add information from alignments to text
             # documents
-            tbox_view = mmif.get_view_contains(AnnotationTypes.BoundingBox)
+            tbox_view = mmif.get_view_contains(str(AnnotationTypes.BoundingBox))
             tbox_annotations = tbox_view.annotations
             # For the boxes we pull some information from the annotation: the
             # identifier, boxType and the (x,y,w,h) coordinates used by the
@@ -193,7 +209,7 @@ def get_media(mmif):
 def get_document_type_short_form(document):
     """Returns 'Video', 'Text', 'Audio' or 'Image' from the document type of
     the document."""
-    document_type = os.path.split(document.at_type)[1]
+    document_type = os.path.split(str(document.at_type))[1]
     return document_type[:-8]
 
 
@@ -261,7 +277,7 @@ def get_document_ids(view, annotation_type):
     metadata = view.metadata.contains.get(annotation_type)
     ids = set([metadata['document']]) if 'document' in metadata else set()
     for annotation in view.annotations:
-        if annotation.at_type.endswith(annotation_type):
+        if str(annotation.at_type).endswith(str(annotation_type)):
             try:
                 ids.add(annotation.properties["document"])
             except KeyError:
@@ -276,7 +292,7 @@ def get_alignment_views(mmif):
     needed_types = set(['TextDocument', 'Token', 'TimeFrame', 'Alignment'])
     for view in mmif.views:
         annotation_types = view.metadata.contains.keys()
-        annotation_types = [os.path.split(at)[-1] for at in annotation_types]
+        annotation_types = [os.path.split(str(at))[-1] for at in annotation_types]
         if needed_types.issubset(annotation_types):
             views.append(view)
     return views
