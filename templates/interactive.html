@@ -1,0 +1,42 @@
+<script
+	src="https://code.jquery.com/jquery-3.6.1.js"
+	integrity="sha256-3zlB5s2uwoUzrXK3BT7AX3FyvojsraNFxCc2vC/7pNI="
+	crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css" />
+
+<style>
+    #tree {
+        width: 100%
+    }
+</style>
+
+<script>
+    $(function () { $('#tree').jstree({
+        "types": {
+            "view" : { "icon": "fa fa-eye"},
+            "annotation" : {"icon": "fa fa-pencil"},
+            "properties" : {"icon": "fa fa-list"}
+        },
+        "plugins": [ "themes", "json_data", "ui", "types", "search"]
+    }) });
+</script>
+
+<div id='tree'>
+    <ul>
+    {% for view in mmif.views %}
+        <li data-jstree='{"type":"view"}'>{{view.id}}
+            <ul>
+                {% for annotation in view.annotations %}
+                <li data-jstree='{"type":"annotation"}'>{{annotation.at_type}}
+                    <ul>
+                        <li data-jstree='{"type":"properties"}'>{{annotation.properties}}</li>
+                    </ul>
+                </li>
+                {% endfor %}
+            </ul>
+        </li>
+    {% endfor %}
+    </ul>
+</div>
