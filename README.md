@@ -92,7 +92,7 @@ The data sources are embedded in a MMIF file and it is the MMIF file that is han
 2. /data/audio/cpb-aacip-507-z31ng4hp5t.part.wav
 3. /data/text/cpb-aacip-507-z31ng4hp5t.part.trn
 
-The Flask server will look for these files in `static/data/video`, `static/data/audio` and `static/data/text`, amd those directories should point at the appropriate location:
+The Flask server will look for these files in `static/data/video`, `static/data/audio` and `static/data/text`, and those directories should point at the appropriate location:
 
 - If you run the visualizer in a Docker container, then the `-v` option in the docker-run command is used to mount the local data directory `/Users/shared/archive` to the `/data` directory on the container and the `static/data` symlink already points to that.
 - If you run the visualizer on your local machine without using a container, then you have a couple of options (where you may need to remove the current link first):
