@@ -8,7 +8,7 @@
 
 <style>
     #tree {
-        width: 100%
+        width: 700px
     }
 </style>
 
@@ -19,24 +19,37 @@
             "annotation" : {"icon": "fa fa-pencil"},
             "properties" : {"icon": "fa fa-list"}
         },
-        "plugins": [ "themes", "json_data", "ui", "types", "search"]
+        "plugins": [ "themes", "json_data", "ui", "types", "search"],
+        "search": {
+            "case_sensitive": false,
+            "show_only_matches": true,
+            "show_only_matches_children" : true
+        }
     }) });
-</script>
+    $(document).ready(function() {
+        $("#search_mmif").keyup(function(){
+            $('#tree').jstree('search', $(this).val());
+    })
+    })
 
-<div id='tree'>
-    <ul>
-    {% for view in mmif.views %}
-        <li data-jstree='{"type":"view"}'>{{view.id}}
-            <ul>
-                {% for annotation in view.annotations %}
-                <li data-jstree='{"type":"annotation"}'>{{annotation.at_type}}
-                    <ul>
-                        <li data-jstree='{"type":"properties"}'>{{annotation.properties}}</li>
-                    </ul>
-                </li>
-                {% endfor %}
-            </ul>
-        </li>
-    {% endfor %}
-    </ul>
+</script>
+<div>
+    <input id="search_mmif">
+    <div id='tree'>
+        <ul>
+        {% for view in mmif.views %}
+            <li data-jstree='{"type":"view"}'>{{view.id}}
+                <ul>
+                    {% for annotation in view.annotations %}
+                    <li data-jstree='{"type":"annotation"}'>{{annotation.at_type}}
+                        <ul>
+                            <li data-jstree='{"type":"properties"}'>{{annotation.properties}}</li>
+                        </ul>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
 </div>
