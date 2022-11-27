@@ -27,14 +27,20 @@
         }
     }) });
     $(document).ready(function() {
-        $("#search_mmif").keyup(function(){
-            $('#tree').jstree('search', $(this).val());
-    })
+        $("#search_button").click(function(){
+            $('#tree').jstree('search', $("#search_input").val());
+        });
+        $("#search_input").keypress(function(e){
+            if(e.which == 13) {
+                $("#search_button").click();
+            }
+        });
     })
 
 </script>
 <div>
-    <input id="search_mmif">
+    <input id="search_input" />
+    <button type="button" id="search_button">Search</button>
     <div id='tree'>
         <ul>
         {% for view in mmif.views %}
