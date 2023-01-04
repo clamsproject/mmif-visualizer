@@ -8,18 +8,33 @@
 
 <style>
     #tree {
-        width: 700px
+        width: 100%
     }
+    .highlighted {
+        background-color: #E8E8E8 !important;
+    }
+    .props {
+        background-color: inherit !important;
+    }
+    
 </style>
 
 <script>
     $(function () { $('#tree').jstree({
+        // Custom row styling with types;
+        // types assigned via HTML are given class attributes here for custom CSS
         "types": {
-            "view" : { "icon": "fa fa-eye"},
-            "annotation" : {"icon": "fa fa-pencil"},
-            "properties" : {"icon": "fa fa-list"}
+            "view" : {"icon": "fa fa-eye"},
+            "annotation-highlighted": {
+                "icon": "fa fa-pencil",
+                "li_attr": {"class": "highlighted"}
+            },
+            "annotation" : {"icon": "fa fa-pencil", "li_attr": {"id": "annotation"}},
+            "properties" : {
+                "icon": "fa fa-list",
+                "li_attr": {"class": "props"}}
         },
-        "plugins": [ "themes", "json_data", "ui", "types", "search"],
+        "plugins": [ "types", "search"],
         "search": {
             "case_sensitive": false,
             "show_only_matches": true,
@@ -43,15 +58,20 @@
     <button type="button" id="search_button">Search</button>
     <div id='tree'>
         <ul>
+        {% set cluster = namespace(colored=True) %}
         {% for view in mmif.views %}
-            <li data-jstree='{"type":"view"}'>{{view.id}}
+            <li data-jstree='{"type":"view"}'>{{view.metadata.app}} ({{view.id}})
                 <ul>
                     {% for annotation in view.annotations %}
-                    <li data-jstree='{"type":"annotation"}'>{{annotation.at_type}}
-                        <ul>
-                            <li data-jstree='{"type":"properties"}'>{{annotation.properties}}</li>
-                        </ul>
-                    </li>
+                        <li data-jstree='{"type": "{{"annotation" if cluster.colored else "annotation-highlighted"}}"}'>{{annotation.at_type}}
+                            <ul>
+                                <li data-jstree='{"type":"properties"}'>{{annotation.properties}}</li>
+                            </ul>
+                            {% if "Alignment" in annotation.at_type|string %}
+                                {% set cluster.colored = not cluster.colored %}
+                            {% endif %}
+                        </li>
+                        
                     {% endfor %}
                 </ul>
             </li>
