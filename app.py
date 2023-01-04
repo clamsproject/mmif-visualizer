@@ -3,6 +3,9 @@ import sys
 import json
 import secrets
 
+import cv2
+
+
 from io import StringIO
 from string import Template
 
@@ -112,6 +115,7 @@ def build_alignment(alignment, token_idx, timeframe_idx):
 
 
 def html_video(vpath, vtt_srcview=None):
+    print(vpath)
     vpath = url2posix(vpath)
     html = StringIO()
     html.write("<video controls>\n")
@@ -144,11 +148,11 @@ def html_text(tpath):
         return f"{content}\n"
 
 
-def html_img(ipath, boxes=None):
+def html_img(ipath, boxes=None, id="imgCanvas"):
     ipath = url2posix(ipath)
     boxes = [] if boxes is None else boxes
     t = Template(open('templates/image.html').read())
-    return t.substitute(filename=ipath, boxes=boxes)
+    return t.substitute(filename=ipath, boxes=boxes, id=id)
 
 
 def html_audio(apath):
@@ -256,22 +260,51 @@ def create_ner_visualization(mmif, view):
         # the view's entities refer to more than one text document (tessearct)
         pass
 
+def get_video_path(mmif):
+    media = get_media(mmif)
+    for file in media:
+        if file[0] == "Video":
+            return file[2]
+    return None    
 
 def create_ocr_visualization(mmif, view):
     # TODO: the text boxes had no timePoint so I could not create a VTT
     # TODO: no app in the metadata
     text = '<pre>'
+
+    # Read video as CV2 VideoCapture to extract screenshots + BoundingBoxes
+    vid_path = get_video_path(mmif)
+    cv2_vid = cv2.VideoCapture(vid_path)
+
     for anno in view.annotations:
         try:
-            if anno.at_type.endswith('TextDocument'):
-                # TODO: this is a hack because the text documents do not have a text
-                # field, instead they have an @value field
-                t = str(anno.properties).split('"id":')
-                t = anno.properties['_value']
-                t = ' '.join(t.split()).strip()
+            if str(anno.at_type).endswith('BoundingBox'):
+
+                frame_num = anno.properties["frame"]
+                cv2_vid.set(1, frame_num)
+                ret, frame = cv2_vid.read()
+                tf = tempfile.NamedTemporaryFile(prefix="/app/static/temp/", suffix=".jpg", delete=False)
+                cv2.imwrite(tf.name, frame)
+                print(os.path.exists(tf.name))
+
+                box_id = anno.properties["id"]
+                boxType = anno.properties["boxType"]
+                coordinates = anno.properties["coordinates"]
+                x = coordinates[0][0]
+                y = coordinates[0][1]
+                w = coordinates[3][0] - x
+                h = coordinates[3][1] - y
+                boxes = [[box_id, boxType, [x, y, w, h]]]
+
+                text += f'<div class="ocr">{html_img(tf.name[12:] , id = tf.name[12:], boxes = boxes)}<div><h4>frame: {frame_num}</h4>\n'
+            
+            elif str(anno.at_type).endswith('TextDocument'):
+                t = anno.properties["text_value"]
                 if t:
-                    text += t + '\n'
-        except:
+                    text += f"<h4>text: {t}</h4></div></div>\n"
+
+        except Exception as e:
+            print(e)
             pass
     return text + '</pre>'
 
@@ -300,18 +333,18 @@ def get_alignment_views(mmif):
             views.append(view)
     return views
 
-
 def get_ocr_views(mmif):
     """Return OCR views, which have TextDocument and Alignment annotations, but no
     other annotations."""
     views = []
     # TODO: not sure why we use the full URL
     needed_types = set([
-        "http://mmif.clams.ai/0.2.1/vocabulary/TextDocument",
-        "http://mmif.clams.ai/0.2.1/vocabulary/Alignment" ])
+        "http://mmif.clams.ai/0.4.0/vocabulary/TextDocument",
+        "http://mmif.clams.ai/0.4.0/vocabulary/BoundingBox",
+        "http://mmif.clams.ai/0.4.0/vocabulary/Alignment" ])
     for view in mmif.views:
         annotation_types = view.metadata.contains.keys()
-        if needed_types.issubset(annotation_types) and len(annotation_types) == 2:
+        if needed_types.issubset(annotation_types) and len(annotation_types) == 3:
             views.append(view)
     return views
 

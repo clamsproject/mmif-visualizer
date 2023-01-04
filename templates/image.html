@@ -1,57 +1,62 @@
-<canvas id="imgCanvas" width="350" height="1000"></canvas>
+<canvas id="$id" width="350" height="1000"></canvas>
 
 <script>	
 
-var boxes = $boxes;
+drawImage();
 
-var canvas = document.getElementById('imgCanvas');
-var context = canvas.getContext('2d');
-var imageObj = new Image();
+function drawImage() {
+    var boxes = $boxes;
 
-imageObj.src = '$filename';
+    var canvas = document.getElementById('$id');
+    var context = canvas.getContext('2d');
+    var imageObj = new Image();
 
-imageObj.onload = function() {
-    
-    var imgWidth = imageObj.naturalWidth;
-    var imgHeight = imageObj.naturalHeight;
-    var screenWidth  = canvas.width;
-    var screenHeight = canvas.height;
-    var scaleX = 1;
-    var scaleY = 1;
+    imageObj.src = '$filename';
 
-    if (imgWidth > screenWidth)
-	scaleX = screenWidth/imgWidth;
-    if (imgHeight > screenHeight)
-        scaleY = screenHeight/imgHeight;
+    imageObj.onload = function() {
+        
+        var imgWidth = imageObj.naturalWidth;
+        var imgHeight = imageObj.naturalHeight;
+        var screenWidth  = canvas.width;
+        var screenHeight = canvas.height;
+        var scaleX = 1;
+        var scaleY = 1;
 
-    var scale = scaleY;
+        if (imgWidth > screenWidth)
+        scaleX = screenWidth/imgWidth;
+        if (imgHeight > screenHeight)
+            scaleY = screenHeight/imgHeight;
 
-    if (scaleX < scaleY)
-        scale = scaleX;
-    if (scale < 1) {
-        imgHeight = imgHeight*scale;
-        imgWidth = imgWidth*scale; }
+        var scale = scaleY;
 
-    canvas.height = imgHeight;
-    canvas.width = imgWidth;
-    context.drawImage(imageObj, 0, 0,
-		      imageObj.naturalWidth, imageObj.naturalHeight, 0,0,
-		      imgWidth, imgHeight);
-    context.beginPath();
-    context.lineWidth = "4";
-    context.strokeStyle = "blue";
-    context.scale(scale, scale);
-    context.font = 'normal 16px serif';
+        if (scaleX < scaleY)
+            scale = scaleX;
+        if (scale < 1) {
+            imgHeight = imgHeight*scale;
+            imgWidth = imgWidth*scale; }
 
-    for (var i=0; i < boxes.length; i++) {
-	var id = boxes[i][0];
-        var x = boxes[i][2][0];
-        var y = boxes[i][2][1];
-        var w = boxes[i][2][2];
-        var h = boxes[i][2][3];
-        context.fillText(id, x + 5, y + 15);
-        context.rect(x, y, w, h);
-    }
-    context.stroke();
+        canvas.height = imgHeight;
+        canvas.width = imgWidth;
+        context.drawImage(imageObj, 0, 0,
+                imageObj.naturalWidth, imageObj.naturalHeight, 0,0,
+                imgWidth, imgHeight);
+        context.beginPath();
+        context.lineWidth = "4";
+        context.strokeStyle = "blue";
+        context.scale(scale, scale);
+        context.font = 'normal 16px serif';
+
+        for (var i=0; i < boxes.length; i++) {
+        var id = boxes[i][0];
+            var x = boxes[i][2][0];
+            var y = boxes[i][2][1];
+            var w = boxes[i][2][2];
+            var h = boxes[i][2][3];
+            context.fillText(id, x + 5, y + 15);
+            context.rect(x, y, w, h);
+        }
+        context.stroke();
+    }   
+
 }
 </script>
