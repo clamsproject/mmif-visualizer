@@ -276,6 +276,10 @@ def create_ocr_visualization(mmif, view):
     vid_path = get_video_path(mmif)
     cv2_vid = cv2.VideoCapture(vid_path)
 
+    tmp_path = '/app/static/tmp'
+    if not os.path.exists(tmp_path):
+        os.makedirs(tmp_path)
+
     for anno in view.annotations:
         try:
             if str(anno.at_type).endswith('BoundingBox'):
@@ -283,9 +287,8 @@ def create_ocr_visualization(mmif, view):
                 frame_num = anno.properties["frame"]
                 cv2_vid.set(1, frame_num)
                 ret, frame = cv2_vid.read()
-                tf = tempfile.NamedTemporaryFile(prefix="/app/static/temp/", suffix=".jpg", delete=False)
+                tf = tempfile.NamedTemporaryFile(prefix="/app/static/tmp/", suffix=".jpg", delete=False)
                 cv2.imwrite(tf.name, frame)
-                print(os.path.exists(tf.name))
 
                 box_id = anno.properties["id"]
                 boxType = anno.properties["boxType"]
