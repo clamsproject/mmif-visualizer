@@ -37,10 +37,15 @@
     .ocr {
       display: flex;
       flex-direction: row;
+      margin-bottom: 5px
     }
     .ocr > div {
       /* align-self: center; */
       margin-left: 10px;
+    }
+    .timestamp {
+      color: #007bff  !important;
+      cursor: pointer;
     }
 </style>
 
@@ -117,3 +122,13 @@
 </body>
 
 </html>
+
+<script>
+  var vid = document.getElementById("vid");
+
+  function SetCurTime(timeValue) {
+    console.log("setting time...")
+    vid.currentTime = timeValue;
+  }
+
+</script>
