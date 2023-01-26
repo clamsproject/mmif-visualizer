@@ -1,0 +1,105 @@
+<div id="ocr_tab">
+
+    {% for frame_num, frame in frames.items() %}
+        {% set filename = frame["id"] %}
+        {% set id = frame["id"] %}
+        {% set boxes = frame["boxes"] %}
+        {% set secs = frame["secs"] %}
+        {% set repeat = frame["repeat"] %}
+        <button type="button" class="collapsible-{{repeat}}">SHOW DUPLICATE(S)</button>
+        <div class="repeat-{{repeat}}">
+            <div class="ocr">
+                {% include "image.html" %}
+                <div>
+                    <h4>
+                        frame: {{frame_num}}<br>
+                        timestamp: <a class="timestamp" onclick="SetCurTime('{{secs}}')">{{frame["timestamp"]}}</a><br>
+                        text detected:<br>
+                        {% for text in frame["text"] %}
+                        &emsp;{{text}}<br>
+                        {% endfor %}
+                    </h4>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+
+    {% if remaining_frames %}
+        <button onclick="nextPage()">Next Page</button>
+    {% endif %}
+
+</div>
+
+<style>
+    .collapsible-False {
+        visibility: hidden
+    }
+    /* Style for the duplicate button */
+    .collapsible-True {
+        display: block;
+        width: 350px;
+        background-color: #f44336; /* Red */
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        text-align: center;
+        font-size: 1.2em;
+        font-weight: bold;
+        margin-top: 20px;
+        letter-spacing: 2px;
+        box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+        transition: background-color 0.3s ease;
+    }
+
+    /* Style for the duplicate button when hovered over */
+    .collapsible-True:hover {
+        background-color: #ff7961; /* Light red */
+    }
+
+    /* Style for the duplicate button when it's active */
+    .collapsible-True.active {
+        background-color: #4CAF50; /* Green */
+    }
+
+    canvas {
+        align-self:flex-start;
+    }
+</style>
+
+<script type="text/javascript">
+
+   function nextPage() {
+        data = {
+            "vid_path": "{{vid_path}}",
+            "frames": "{{frames}}",
+            "remaining_frames": "{{remaining_frames}}",
+            "alignments": "{{alignments}}",
+            "text_docs": "{{text_docs}}"
+        }
+        $.ajax({
+            type:'POST',
+            url:'/ocrpage',
+            data: data,
+            success: function(res_html){
+              $('#ocr_tab').parent().html(res_html);
+            }
+        })
+    }
+  
+    var vid = document.getElementById("vid");
+  
+    function SetCurTime(timeValue) {
+        vid.currentTime = timeValue;
+    }
+
+    $(".collapsible-True").nextUntil(".collapsible-False", "button").remove();
+
+    $(".collapsible-True").click(function() {
+        
+        $(this).nextUntil(".repeat-False").slideToggle();
+        $(this).text(function(i, text) {
+            return text == "SHOW DUPLICATE(S)" ? "HIDE DUPLICATE(S)" : "SHOW DUPLICATE(S)"
+        })
+    })
+  
+  </script>
