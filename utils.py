@@ -25,66 +25,10 @@ from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
 
 
+# Get Properties from MMIF file ---
+
 # these two static folder-related params are important, do not remove
 app = Flask(__name__, static_folder='static', static_url_path='')
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/ocrpage', methods=['POST'])
-def ocrpage():
-    try:
-        data = request.form.to_dict()
-        print("Data:")
-        remaining_frames = eval(html.unescape(data['remaining_frames']))
-        print("remaining_frames...")
-        alignments = eval(html.unescape(data['alignments']))
-        print("text_docs... ", data["text_docs"])
-        text_docs = eval(html.unescape(data['text_docs']))
-        return (render_ocr(data['vid_path'], remaining_frames, alignments, text_docs, 5))
-    except Exception as e:
-        print(f"Unexpected error of type {type(e)}: {e}")
-        pass
-
-@app.route('/upload', methods=['GET', 'POST'])
-def upload():
-    # NOTE. Uses of flash() originally gaven a RuntimeError (The session is
-    # unavailable because no secret key was set). This was solved in the
-    # __main__ block by setting a key.
-    if request.method == 'POST':
-        # check if the post request has the file part
-        if 'file' not in request.files:
-            flash('WARNING: post request has no file part')
-            return redirect(request.url)
-        file = request.files['file']
-        # if user does not select file, browser also
-        # submit an empty part without filename
-        if file.filename == '':
-            flash('WARNING: no file was selected')
-            return redirect(request.url)
-        if file:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join('temp', filename))
-            with open("temp/" + filename) as fh:
-                mmif_str = fh.read()
-                return render_mmif(mmif_str)
-    return render_template('upload.html')
-
-
-def render_mmif(mmif_str):
-    mmif = Mmif(mmif_str)
-    media = get_media(mmif)
-    annotations = prep_annotations(mmif)
-    return render_template('player.html',
-                           mmif=mmif, media=media, annotations=annotations)
-
-
-def view_to_vtt(alignment_view):
-    """Write alignments to a file in VTT style and return the filename."""
-    vtt_file = get_alignments(alignment_view)
-    return os.sep.join(vtt_file.name.split(os.sep)[-2:])
-
 
 def get_alignments(alignment_view):
     vtt_file = tempfile.NamedTemporaryFile('w', dir="static/", suffix='.vtt', delete=False)
@@ -118,7 +62,6 @@ def get_alignments(alignment_view):
                 texts = []
     return vtt_file
 
-
 def build_alignment(alignment, token_idx, timeframe_idx):
     target = alignment.properties['target']
     source = alignment.properties['source']
@@ -130,6 +73,121 @@ def build_alignment(alignment, token_idx, timeframe_idx):
         text = token.properties['word']
         return start, end, text
 
+def get_media(mmif):
+    # Returns a list of tuples, one for each element in the documents list of
+    # the MMIF object, following the order in that list. Each tuple has four
+    # elements: document type, document identifier, document path and the HTML
+    # visualization.
+    media = []
+    for document in mmif.documents:
+        doc_type = get_document_type_short_form(document)
+        doc_path = document.location
+        print('>>>', doc_path)
+        if doc_type == 'Text':
+            html = html_text(doc_path)
+        elif doc_type == 'Video':
+            fa_views = get_alignment_views(mmif)
+            fa_view = fa_views[0] if fa_views else None
+            html = html_video(doc_path, fa_view)
+        elif doc_type == 'Audio':
+            html = html_audio(doc_path)
+        elif doc_type == 'Image':
+            # TODO: this gives you the last view with BoundingBoxes, should
+            # perhaps use get_views_contain() instead, should also select just
+            # the bounding boxes and add information from alignments to text
+            # documents
+            tbox_view = mmif.get_view_contains(str(AnnotationTypes.BoundingBox))
+            tbox_annotations = tbox_view.annotations
+            # For the boxes we pull some information from the annotation: the
+            # identifier, boxType and the (x,y,w,h) coordinates used by the
+            # Javascript code that draws the rectangle.
+            boxes = []
+            for a in tbox_annotations:
+                coordinates = a.properties["coordinates"]
+                x = coordinates[0][0]
+                y = coordinates[0][1]
+                w = coordinates[1][0] - x
+                h = coordinates[2][1] - y
+                box = [a.properties["id"], a.properties["boxType"], [x, y, w, h]]
+                boxes.append(box)
+            html = html_img(doc_path, boxes)
+        media.append((doc_type, document.id, doc_path, html))
+    return media
+
+
+def get_document_type_short_form(document):
+    """Returns 'Video', 'Text', 'Audio' or 'Image' from the document type of
+    the document."""
+    document_type = os.path.split(str(document.at_type))[1]
+    return document_type[:-8]
+
+
+def prep_annotations(mmif):
+    """Prepare annotations from the views, and return a list of pairs of tabname
+    and tab content. The first tab is alway the full MMIF pretty print."""
+    tabs = [("MMIF", "<pre>" + mmif.serialize(pretty=True) + "</pre>"),
+            ("Interactive_MMIF", render_interactive_mmif(mmif))]
+    # TODO: since this uses the same tab-name this will only show the same
+    # stuff; it does a loop but for now we assume there is just one file with
+    # alignments (generated by Kaldi)
+    for fa_view in get_alignment_views(mmif):
+        vtt_file = view_to_vtt(fa_view)
+        tabs.append(("WEBVTT", '<pre>' + open(vtt_file).read() + '</pre>'))
+    ner_views = get_ner_views(mmif)
+    use_id = True if len(ner_views) > 1 else False
+    for ner_view in ner_views:
+        if not ner_view.annotations:
+            continue
+        visualization = create_ner_visualization(mmif, ner_view)
+        tabname = "Entities-%s" % ner_view.id if use_id else "Entities"
+        tabs.append((tabname, visualization))
+    # TODO: somewhat hackish
+    ocr_views = get_ocr_views(mmif)
+    use_id = True if len(ocr_views) > 1 else False
+    for ocr_view in ocr_views:
+        if not ocr_view.annotations:
+            continue
+        visualization = prepare_ocr_visualization(mmif, ocr_view)
+        tabname = "OCR-%s" % ocr_view.id if use_id else "OCR"
+        tabs.append((tabname, visualization))
+    return tabs
+
+
+def get_video_path(mmif):
+    media = get_media(mmif)
+    for file in media:
+        if file[0] == "Video":
+            return file[2]
+    return None    
+
+
+def get_document_ids(view, annotation_type):
+    metadata = view.metadata.contains.get(annotation_type)
+    ids = set([metadata['document']]) if 'document' in metadata else set()
+    for annotation in view.annotations:
+        if str(annotation.at_type).endswith(str(annotation_type)):
+            try:
+                ids.add(annotation.properties["document"])
+            except KeyError:
+                pass
+    return list(ids)
+
+
+def get_alignment_views(mmif):
+    """Return alignment views which have at least TextDocument, Token, TimeFrame and
+    Alignment annotations."""
+    views = []
+    needed_types = set(['TextDocument', 'Token', 'TimeFrame', 'Alignment'])
+    for view in mmif.views:
+        annotation_types = view.metadata.contains.keys()
+        annotation_types = [os.path.split(str(at))[-1] for at in annotation_types]
+        if needed_types.issubset(annotation_types):
+            views.append(view)
+    return views
+
+
+
+# Remder Media as HTML ------------
 
 def html_video(vpath, vtt_srcview=None):
     print(vpath)
@@ -184,88 +242,20 @@ def url2posix(path):
         path = path[7:]
     return path
 
-
-def get_media(mmif):
-    # Returns a list of tuples, one for each element in the documents list of
-    # the MMIF object, following the order in that list. Each tuple has four
-    # elements: document type, document identifier, document path and the HTML
-    # visualization.
-    media = []
-    for document in mmif.documents:
-        doc_type = get_document_type_short_form(document)
-        doc_path = document.location
-        print('>>>', doc_path)
-        if doc_type == 'Text':
-            html = html_text(doc_path)
-        elif doc_type == 'Video':
-            fa_views = get_alignment_views(mmif)
-            fa_view = fa_views[0] if fa_views else None
-            html = html_video(doc_path, fa_view)
-        elif doc_type == 'Audio':
-            html = html_audio(doc_path)
-        elif doc_type == 'Image':
-            # TODO: this gives you the last view with BoundingBoxes, should
-            # perhaps use get_views_contain() instead, should also select just
-            # the bounding boxes and add information from alignments to text
-            # documents
-            tbox_view = mmif.get_view_contains(str(AnnotationTypes.BoundingBox))
-            tbox_annotations = tbox_view.annotations
-            # For the boxes we pull some information from the annotation: the
-            # identifier, boxType and the (x,y,w,h) coordinates used by the
-            # Javascript code that draws the rectangle.
-            boxes = []
-            for a in tbox_annotations:
-                coordinates = a.properties["coordinates"]
-                x = coordinates[0][0]
-                y = coordinates[0][1]
-                w = coordinates[1][0] - x
-                h = coordinates[2][1] - y
-                box = [a.properties["id"], a.properties["boxType"], [x, y, w, h]]
-                boxes.append(box)
-            html = html_img(doc_path, boxes)
-        media.append((doc_type, document.id, doc_path, html))
-    return media
-
-
-def get_document_type_short_form(document):
-    """Returns 'Video', 'Text', 'Audio' or 'Image' from the document type of
-    the document."""
-    document_type = os.path.split(str(document.at_type))[1]
-    return document_type[:-8]
+# Interactive MMIF Tab -----------
 
 def render_interactive_mmif(mmif):
     return render_template('interactive.html', mmif=mmif)
 
-def prep_annotations(mmif):
-    """Prepare annotations from the views, and return a list of pairs of tabname
-    and tab content. The first tab is alway the full MMIF pretty print."""
-    tabs = [("MMIF", "<pre>" + mmif.serialize(pretty=True) + "</pre>"),
-            ("Interactive_MMIF", render_interactive_mmif(mmif))]
-    # TODO: since this uses the same tab-name this will only show the same
-    # stuff; it does a loop but for now we assume there is just one file with
-    # alignments (generated by Kaldi)
-    for fa_view in get_alignment_views(mmif):
-        vtt_file = view_to_vtt(fa_view)
-        tabs.append(("WEBVTT", '<pre>' + open(vtt_file).read() + '</pre>'))
-    ner_views = get_ner_views(mmif)
-    use_id = True if len(ner_views) > 1 else False
-    for ner_view in ner_views:
-        if not ner_view.annotations:
-            continue
-        visualization = create_ner_visualization(mmif, ner_view)
-        tabname = "Entities-%s" % ner_view.id if use_id else "Entities"
-        tabs.append((tabname, visualization))
-    # TODO: somewhat hackish
-    ocr_views = get_ocr_views(mmif)
-    use_id = True if len(ocr_views) > 1 else False
-    for ocr_view in ocr_views:
-        if not ocr_view.annotations:
-            continue
-        visualization = create_ocr_visualization(mmif, ocr_view)
-        tabname = "OCR-%s" % ocr_view.id if use_id else "OCR"
-        tabs.append((tabname, visualization))
-    return tabs
+# NER Tools ----------------------
 
+def get_ner_views(mmif):
+    return [v for v in mmif.views if Uri.NE in v.metadata.contains]
+
+def view_to_vtt(alignment_view):
+    """Write alignments to a file in VTT style and return the filename."""
+    vtt_file = get_alignments(alignment_view)
+    return os.sep.join(vtt_file.name.split(os.sep)[-2:])
 
 def create_ner_visualization(mmif, view):
     metadata = view.metadata.contains.get(Uri.NE)
@@ -277,16 +267,9 @@ def create_ner_visualization(mmif, view):
         # the view's entities refer to more than one text document (tessearct)
         pass
 
+# OCR Tools ----------------------
 
-def get_video_path(mmif):
-    media = get_media(mmif)
-    for file in media:
-        if file[0] == "Video":
-            return file[2]
-    return None    
-
-
-def create_ocr_visualization(mmif, view):
+def prepare_ocr_visualization(mmif, view):
     """ Visualize OCR by extracting image frames with BoundingBoxes from video"""
     frames, text_docs, alignments = {}, {}, {}
 
@@ -327,13 +310,11 @@ def create_ocr_visualization(mmif, view):
             pass
 
     vid_path = get_video_path(mmif)
-    return render_ocr(vid_path, frames, alignments, text_docs, 5)
+    frames_list = [(k, v) for k, v in frames.items()]
+    return render_ocr(vid_path, frames_list, alignments, text_docs, 0, 2, 3)
 
 
-def render_ocr(vid_path, frames, alignments, text_docs, n):
-    # TODO: Deletion
-    new_frames = {}
-    remaining_frames = frames.copy()
+def render_ocr(vid_path, frames, alignments, text_docs, lower_n, upper_n, step):
     """Iterate through frames and display the contents/alignments."""
     # Read video as CV2 VideoCapture to extract screenshots + BoundingBoxes
     cv2_vid = cv2.VideoCapture(vid_path)
@@ -343,9 +324,13 @@ def render_ocr(vid_path, frames, alignments, text_docs, n):
     if not os.path.exists(tmp_path):
         os.makedirs(tmp_path)
 
-    i = 0
     prev_frame = {}
-    for frame_num, frame in frames.items():
+    i, upper_i = lower_n, upper_n
+    while i <= upper_i:
+        if i >= len(frames) or i < 0:
+            break
+        frame_num, frame = frames[i]
+        print(frame["timestamp"])
         cv2_vid.set(1, frame_num)
         _, frame_cap = cv2_vid.read()
         with tempfile.NamedTemporaryFile(
@@ -353,35 +338,32 @@ def render_ocr(vid_path, frames, alignments, text_docs, n):
             cv2.imwrite(tf.name, frame_cap)
             # "id" is just the name of the temp image file
             frame["id"] = tf.name[12:]
-            new_frames[frame_num] = frame
-            new_frame = new_frames[frame_num]
-            del remaining_frames[frame_num]
-            if fps:
-                secs = int(frame_num/fps)
-                new_frame["timestamp"] = datetime.timedelta(seconds=secs)
-                new_frame["secs"] = secs
-            for box_id in frame["bb_ids"]:
-                text_id = alignments[box_id]
-                new_frame["text"].append(text_docs[text_id])
+            # If frame has text, it has already been processed
+            if not frame["text"]:
+                if fps:
+                    secs = int(frame_num/fps)
+                    frame["timestamp"] = datetime.timedelta(seconds=secs)
+                    frame["secs"] = secs
+                for box_id in frame["bb_ids"]:
+                    text_id = alignments[box_id]
+                    frame["text"].append(text_docs[text_id])
             
             # Check for duplicates
-            if is_duplicate_ocr_frame(new_frame, prev_frame):
-                new_frame["repeat"] = True
-                i -=1
-            prev_frame = new_frame
-            
-            
-            if i >= n:
-                return render_template('ocr.html', 
-                                       vid_path=vid_path, 
-                                       frames=new_frames, 
-                                       remaining_frames=remaining_frames, 
-                                       alignments=alignments, 
-                                       text_docs=text_docs)
+            if is_duplicate_ocr_frame(frame, prev_frame):
+                frame["repeat"] = True
+                upper_i += 1
+                upper_n += 1
+                print("upper i changed to", upper_i)
 
+            prev_frame = frame
             i += 1
 
-    return render_template('ocr.html', frames=new_frames, alignments=alignments, text_docs=text_docs)
+    return render_template('ocr.html', 
+                           vid_path=vid_path, 
+                           frames=frames, 
+                           alignments=alignments, 
+                           text_docs=text_docs, 
+                           lower_n=lower_n, upper_n=upper_n, step=step)
 
 def is_duplicate_ocr_frame(frame, prev_frame):
     if prev_frame:
@@ -402,31 +384,6 @@ def round_boxes(boxes):
         rounded_boxes.append(rounded_box)
     return rounded_boxes
 
-
-def get_document_ids(view, annotation_type):
-    metadata = view.metadata.contains.get(annotation_type)
-    ids = set([metadata['document']]) if 'document' in metadata else set()
-    for annotation in view.annotations:
-        if str(annotation.at_type).endswith(str(annotation_type)):
-            try:
-                ids.add(annotation.properties["document"])
-            except KeyError:
-                pass
-    return list(ids)
-
-
-def get_alignment_views(mmif):
-    """Return alignment views which have at least TextDocument, Token, TimeFrame and
-    Alignment annotations."""
-    views = []
-    needed_types = set(['TextDocument', 'Token', 'TimeFrame', 'Alignment'])
-    for view in mmif.views:
-        annotation_types = view.metadata.contains.keys()
-        annotation_types = [os.path.split(str(at))[-1] for at in annotation_types]
-        if needed_types.issubset(annotation_types):
-            views.append(view)
-    return views
-
 def get_ocr_views(mmif):
     """Return OCR views, which have TextDocument and Alignment annotations, but no
     other annotations."""
@@ -441,25 +398,3 @@ def get_ocr_views(mmif):
         if needed_types.issubset(annotation_types) and len(annotation_types) == 3:
             views.append(view)
     return views
-
-
-def get_ner_views(mmif):
-    return [v for v in mmif.views if Uri.NE in v.metadata.contains]
-
-
-# Not sure what this was for, it had a route /display, but that did not work
-# def display_file():
-#    mmif_str = requests.get(request.args["file"]).text
-#    return display_mmif(mmif_str)
-
-
-if __name__ == '__main__':
-
-    # to avoid runtime errors for missing keys when using flash()
-    alphabet = 'abcdefghijklmnopqrstuvwxyz1234567890'
-    app.secret_key = ''.join(secrets.choice(alphabet) for i in range(36))
-
-    port = 5000
-    if len(sys.argv) > 2 and sys.argv[1] == '-p':
-        port = int(sys.argv[2])
-    app.run(port=port, host='0.0.0.0', debug=True)

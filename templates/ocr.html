@@ -1,6 +1,8 @@
 <div id="ocr_tab">
 
-    {% for frame_num, frame in frames.items() %}
+    {% for i in range(lower_n, upper_n+1) %}
+        {% if i < frames|length and i >= 0 %}
+        {% set frame_num, frame = frames[i] %}
         {% set filename = frame["id"] %}
         {% set id = frame["id"] %}
         {% set boxes = frame["boxes"] %}
@@ -22,11 +24,17 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     {% endfor %}
 
-    {% if remaining_frames %}
-        <button onclick="nextPage()">Next Page</button>
-    {% endif %}
+    <div id="page-buttons">
+        {% if lower_n != 0 %}
+            <button onclick="changePage(0)">Previous Page</button>
+        {% endif %}
+        {% if upper_n < frames|length %}
+            <button onclick="changePage(1)">Next Page</button>
+        {% endif %}
+    </div>
 
 </div>
 
@@ -64,18 +72,36 @@
     canvas {
         align-self:flex-start;
     }
+
+    #page-buttons {
+        margin-top: 20px
+    }
 </style>
 
 <script type="text/javascript">
 
-   function nextPage() {
-        data = {
+function changePage(direction) {
+
+        var data = {
             "vid_path": "{{vid_path}}",
             "frames": "{{frames}}",
-            "remaining_frames": "{{remaining_frames}}",
             "alignments": "{{alignments}}",
-            "text_docs": "{{text_docs}}"
+            "text_docs": "{{text_docs}}",
+            "lower_n": parseInt("{{lower_n}}"), 
+            "upper_n": parseInt("{{upper_n}}"),
+            "step": parseInt("{{step}}")
         }
+        const step = parseInt(data["step"]);
+        // const step = 1;
+        // const step = data["upper_n"]-data["lower_n"];
+        // console.log(step);
+        if (direction == 1) {
+            data["lower_n"] += step;        
+        }
+        else {
+            data["lower_n"] -= step;  
+        }
+        data["upper_n"] = data["lower_n"] + step - 1;
         $.ajax({
             type:'POST',
             url:'/ocrpage',
@@ -86,17 +112,16 @@
         })
     }
   
-    var vid = document.getElementById("vid");
-  
     function SetCurTime(timeValue) {
+        const vid = document.getElementById("vid");
         vid.currentTime = timeValue;
     }
 
-    $(".collapsible-True").nextUntil(".collapsible-False", "button").remove();
+    // $(".collapsible-True").nextUntil(".collapsible-False", "button").remove();
 
     $(".collapsible-True").click(function() {
         
-        $(this).nextUntil(".repeat-False").slideToggle();
+        $(this).nextUntil(".repeat-False, #page-buttons").slideToggle();
         $(this).text(function(i, text) {
             return text == "SHOW DUPLICATE(S)" ? "HIDE DUPLICATE(S)" : "SHOW DUPLICATE(S)"
         })
