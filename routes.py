@@ -24,9 +24,8 @@ from mmif.vocabulary import AnnotationTypes
 from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
 
-from utils import app, render_ocr, get_media, prep_annotations
+from utils import app, render_ocr, get_media, prep_annotations, change_page
 # from ocr import render_ocr
-
 
 @app.route('/')
 def index():
@@ -36,14 +35,12 @@ def index():
 def ocrpage():
     try:
         data = request.form.to_dict()
-        frames = eval(html.unescape(data['frames']))
+        frames_pages = eval(html.unescape(data['frames_pages']))
         alignments = eval(html.unescape(data['alignments']))
         text_docs = eval(html.unescape(data['text_docs']))
-        
-        upper_n = int(data['upper_n'])
-        lower_n = int(data['lower_n'])
-        step = int(data['step'])
-        return (render_ocr(data['vid_path'], frames, alignments, text_docs, lower_n, upper_n, step))
+        page_number = int(data['page_number'])
+
+        return (render_ocr(data['vid_path'], frames_pages, alignments, text_docs, page_number))
     except Exception as e:
         print(f"Unexpected error of type {type(e)}: {e}")
         pass

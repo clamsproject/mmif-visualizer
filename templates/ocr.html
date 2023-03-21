@@ -1,8 +1,6 @@
 <div id="ocr_tab">
 
-    {% for i in range(lower_n, upper_n+1) %}
-        {% if i < frames|length and i >= 0 %}
-        {% set frame_num, frame = frames[i] %}
+    {% for frame_num, frame in frames_pages[page_number] %}
         {% set filename = frame["id"] %}
         {% set id = frame["id"] %}
         {% set boxes = frame["boxes"] %}
@@ -14,7 +12,6 @@
                 {% include "image.html" %}
                 <div>
                     <h4>
-                        {{i}} {{frames|length}}<br>
                         frame: {{frame_num}}<br>
                         timestamp: <a class="timestamp" onclick="SetCurTime('{{secs}}')">{{frame["timestamp"]}}</a><br>
                         text detected:<br>
@@ -25,21 +22,37 @@
                 </div>
             </div>
         </div>
-        {% endif %}
     {% endfor %}
-
-    <div id="page-buttons">
-        {% if lower_n != 0 %}
-            <button onclick="changePage(0)">Previous Page</button>
+    <div id="page-buttons" n_pages="{{frames_pages | length}}">
+        <!-- {% if page_number != 0 %}
+            <button onclick="changePage(-1)">Previous Page</button>
         {% endif %}
-        {% if upper_n < frames|length-1 %}
+        {% if page_number < frames_pages|length - 1 %}
             <button onclick="changePage(1)">Next Page</button>
-        {% endif %}
+        {% endif %} -->
     </div>
 
 </div>
 
 <style>
+    /* .repeat-True {
+      display: none;
+    } */
+    .ocr {
+      display: flex;
+      flex-direction: row;
+      margin-bottom: 5px;
+      margin-top: 20px;
+    }
+    .ocr > div {
+      /* align-self: center; */
+      margin-left: 10px;
+    }
+    .timestamp {
+      color: #007bff  !important;
+      cursor: pointer;
+    }
+
     .collapsible-False {
         visibility: hidden
     }
@@ -59,55 +72,53 @@
         box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
         transition: background-color 0.3s ease;
     }
-
     /* Style for the duplicate button when hovered over */
     .collapsible-True:hover {
         background-color: #ff7961; /* Light red */
     }
-
     /* Style for the duplicate button when it's active */
     .collapsible-True.active {
         background-color: #4CAF50; /* Green */
     }
-
     canvas {
         align-self:flex-start;
     }
-
     #page-buttons {
         margin-top: 20px
     }
-
-    .repeats {
-        background-color: aqua;
+    .page-button {
+        margin-right: 10px
     }
-
+    .repeats {
+        background-color: rgba(0,0,0,.05);
+        width: 50vw;
+        display: none;
+        padding: 10px;
+    }
 </style>
 
 <script type="text/javascript">
+BACKWARD = -1
+FORWARD = -2
 
-function changePage(direction) {
-
+function changePage(page) {
+        var pageChange
         var data = {
             "vid_path": "{{vid_path}}",
-            "frames": "{{frames}}",
+            "frames_pages": "{{frames_pages}}",
             "alignments": "{{alignments}}",
             "text_docs": "{{text_docs}}",
-            "lower_n": parseInt("{{lower_n}}"), 
-            "upper_n": parseInt("{{upper_n}}"),
-            "step": parseInt("{{step}}")
+            "page_number": parseInt("{{page_number}}"), 
         }
-        console.log(data["lower_n"]);
-        console.log(data["upper_n"]);
-        console.log(data["step"]);
-        const step = parseInt(data["step"]);
-        if (direction == 1) {
-            data["lower_n"] = data["upper_n"]+1;        
+        if (page == BACKWARD) {
+            data["page_number"] -= 1
+        }
+        else if (page == FORWARD) {
+            data["page_number"] += 1
         }
         else {
-            data["lower_n"] -= step;  
+            data["page_number"] = page;
         }
-        data["upper_n"] = data["lower_n"] + step - 1;
         $.ajax({
             type:'POST',
             url:'/ocrpage',
@@ -123,13 +134,40 @@ function changePage(direction) {
         vid.currentTime = timeValue;
     }
 
-    $(".collapsible-True").nextUntil(".collapsible-False", ".collapsible-True").remove()
+    $(document).ready(function() {
+        
+        // Duplicate frame groups
+        $(".collapsible-True").each(function() {
+            $(this).nextUntil(".collapsible-False", ".collapsible-True").remove();
+            $(this).nextUntil(".repeat-False, #page-buttons").not(".repeat-False, #page-buttons").wrapAll('<div class="repeats" />')
+            $(this).text(function(i, text) {
+                n_repeats = $(this).next().children(".repeat-True").length;
+                return text == `SHOW DUPLICATE(S)` ? `SHOW ${n_repeats} DUPLICATE(S)` : text
+            })
+        });
 
-    $(".collapsible-True").click(function() {
-        $(this).nextUntil(".repeat-False, #page-buttons").slideToggle();
-        $(this).text(function(i, text) {
-            return text == "SHOW DUPLICATE(S)" ? "HIDE DUPLICATE(S)" : "SHOW DUPLICATE(S)"
+        $(".collapsible-True").click(function() {
+            var repeatsDiv = $(this).next();
+            repeatsDiv.slideToggle();
+            $(this).text(function(i, text) {
+                n_repeats = repeatsDiv.children(".repeat-True").length;
+                return text == `SHOW ${n_repeats} DUPLICATE(S)` ? `HIDE ${n_repeats} DUPLICATE(S)` : `SHOW ${n_repeats} DUPLICATE(S)`
+            })
         })
-    })
-  
+
+        $("#page-buttons").each(function() {
+            page_number = parseInt("{{page_number}}")
+            if (page_number > 0) {
+                $(this).append(`<button class="page-button" onClick=changePage(${-1})>\<</button>`)
+            }
+            n_pages = $(this).attr("n_pages");
+            for (var i = 0; i < n_pages; i++) {
+                $(this).append(`<button class="page-button" onClick=changePage(${i})>${i+1}</button>`)
+            }
+            if (page_number < n_pages-1) {
+                $(this).append(`<button class="page-button" onClick=changePage(${-2})>\></button>`)
+            }
+        })
+
+    })  
   </script>
