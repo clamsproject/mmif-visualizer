@@ -14,6 +14,7 @@
                 {% include "image.html" %}
                 <div>
                     <h4>
+                        {{i}} {{frames|length}}<br>
                         frame: {{frame_num}}<br>
                         timestamp: <a class="timestamp" onclick="SetCurTime('{{secs}}')">{{frame["timestamp"]}}</a><br>
                         text detected:<br>
@@ -31,7 +32,7 @@
         {% if lower_n != 0 %}
             <button onclick="changePage(0)">Previous Page</button>
         {% endif %}
-        {% if upper_n < frames|length %}
+        {% if upper_n < frames|length-1 %}
             <button onclick="changePage(1)">Next Page</button>
         {% endif %}
     </div>
@@ -76,6 +77,11 @@
     #page-buttons {
         margin-top: 20px
     }
+
+    .repeats {
+        background-color: aqua;
+    }
+
 </style>
 
 <script type="text/javascript">
@@ -91,12 +97,12 @@ function changePage(direction) {
             "upper_n": parseInt("{{upper_n}}"),
             "step": parseInt("{{step}}")
         }
+        console.log(data["lower_n"]);
+        console.log(data["upper_n"]);
+        console.log(data["step"]);
         const step = parseInt(data["step"]);
-        // const step = 1;
-        // const step = data["upper_n"]-data["lower_n"];
-        // console.log(step);
         if (direction == 1) {
-            data["lower_n"] += step;        
+            data["lower_n"] = data["upper_n"]+1;        
         }
         else {
             data["lower_n"] -= step;  
@@ -117,10 +123,9 @@ function changePage(direction) {
         vid.currentTime = timeValue;
     }
 
-    // $(".collapsible-True").nextUntil(".collapsible-False", "button").remove();
+    $(".collapsible-True").nextUntil(".collapsible-False", ".collapsible-True").remove()
 
     $(".collapsible-True").click(function() {
-        
         $(this).nextUntil(".repeat-False, #page-buttons").slideToggle();
         $(this).text(function(i, text) {
             return text == "SHOW DUPLICATE(S)" ? "HIDE DUPLICATE(S)" : "SHOW DUPLICATE(S)"
