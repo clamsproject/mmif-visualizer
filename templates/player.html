@@ -31,9 +31,9 @@
         width: 100%
     }
     /* make video player dynamically resized */
-    video {
-        width: 100%    !important;
-        height: auto   !important;
+    #vid {
+        width: 100%;
+        height: auto;
     }
 </style>
 
@@ -57,7 +57,7 @@
             <a class="nav-link active" data-toggle="tab" href="#{{ media[0][0] }}">{{ media[0][0] }}</a>
           </li>
           {% for medium in media[1:] %}
-          <li class="nav-item">
+          <li class="nav-item {{medium[0]}}">
             <a class="nav-link" data-toggle="tab" href="#{{ medium[0] }}">{{ medium[0] }}</a>
           </li>
           {%  endfor %}

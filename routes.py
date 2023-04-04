@@ -16,7 +16,7 @@ import re
 import ast
 import html
 
-from flask import Flask, request, render_template, flash, redirect, jsonify
+from flask import Flask, request, render_template, flash, redirect, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 
 from mmif.serialize import Mmif, View
@@ -24,7 +24,7 @@ from mmif.vocabulary import AnnotationTypes
 from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
 
-from utils import app, render_ocr, get_media, prep_annotations, change_page
+from utils import app, render_ocr, get_media, prep_annotations
 # from ocr import render_ocr
 
 @app.route('/')
@@ -70,6 +70,11 @@ def upload():
     return render_template('upload.html')
 
 
+@app.route('/uv/<path:path>')
+def send_js(path):
+    return send_from_directory("uv", path)
+
+
 def render_mmif(mmif_str):
     mmif = Mmif(mmif_str)
     media = get_media(mmif)
@@ -85,6 +90,11 @@ def render_mmif(mmif_str):
 
 
 if __name__ == '__main__':
+    # Make path for temp files
+    tmp_path = '/app/static/tmp'
+    if not os.path.exists(tmp_path):
+        os.makedirs(tmp_path)
+
 
     # to avoid runtime errors for missing keys when using flash()
     alphabet = 'abcdefghijklmnopqrstuvwxyz1234567890'

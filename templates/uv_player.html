@@ -1,0 +1,32 @@
+<!-- import UV -->
+
+<script src=" https://cdn.jsdelivr.net/npm/universalviewer@4.0.17/dist/umd/UV.min.js "></script>
+<link href=" https://cdn.jsdelivr.net/npm/universalviewer@4.0.17/dist/uv.min.css " rel="stylesheet">
+
+<div id="uv" class="uv"></div>
+<style>
+    #uv {
+        width: 550px;
+        height: 375px;
+        position: relative !important;
+        /*
+        object-fit: scale-down; */
+    }
+</style>
+<script>
+    
+    uvLoaded = false;
+
+    $(".nav-item.UV").click(function() {
+        if (!uvLoaded) {
+            const data = {
+                manifest: "/tmp/{{manifest}}",
+                embedded: true
+             };
+
+            UV.init("uv", data);
+            uvLoaded = true;
+        }
+    });
+
+</script>
