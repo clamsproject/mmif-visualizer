@@ -1,31 +1,15 @@
 import os
 import sys
-import datetime
 import secrets
-
-import cv2
-
-
-from io import StringIO
-from string import Template
-
-import displacy
-import requests
-import tempfile
-import re
-import ast
 import html
+import datetime
+import ast
 
-from flask import Flask, request, render_template, flash, redirect, jsonify, send_from_directory
+from flask import request, render_template, flash, redirect, send_from_directory
 from werkzeug.utils import secure_filename
-
-from mmif.serialize import Mmif, View
-from mmif.vocabulary import AnnotationTypes
-from mmif.vocabulary import DocumentTypes
-from lapps.discriminators import Uri
+from mmif.serialize import Mmif
 
 from utils import app, render_ocr, get_media, prep_annotations
-# from ocr import render_ocr
 
 @app.route('/')
 def index():
@@ -33,16 +17,16 @@ def index():
 
 @app.route('/ocrpage', methods=['POST'])
 def ocrpage():
+    data = request.form
     try:
-        data = request.form.to_dict()
+        # print(html.unescape(data['frames_pages']))
         frames_pages = eval(html.unescape(data['frames_pages']))
-        alignments = eval(html.unescape(data['alignments']))
-        text_docs = eval(html.unescape(data['text_docs']))
         page_number = int(data['page_number'])
 
-        return (render_ocr(data['vid_path'], frames_pages, alignments, text_docs, page_number))
+        return (render_ocr(data['vid_path'], frames_pages, page_number))
     except Exception as e:
-        print(f"Unexpected error of type {type(e)}: {e}")
+        print(html.unescape(data['frames_pages']))
+        return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
         pass
 
 @app.route('/upload', methods=['GET', 'POST'])

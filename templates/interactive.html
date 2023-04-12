@@ -20,7 +20,18 @@
 </style>
 
 <script>
-    $(function () { $('#tree').jstree({
+    treeLoaded = false;
+
+    // Lazy load JSTree element (for very large files)
+    $(".nav-item.Interactive_MMIF").click(function() {
+        if (treeLoaded)
+            return
+        treeLoaded = true;
+        loadJSTree();
+    })
+
+    function loadJSTree() {
+        $('#tree').jstree({
         // Custom row styling with types;
         // types assigned via HTML are given class attributes here for custom CSS
         "types": {
@@ -40,8 +51,8 @@
             "show_only_matches": true,
             "show_only_matches_children" : true
         }
-    }) });
-    $(document).ready(function() {
+        }) 
+
         $("#search_button").click(function(){
             $('#tree').jstree('search', $("#search_input").val());
         });
@@ -50,7 +61,8 @@
                 $("#search_button").click();
             }
         });
-    })
+
+    }
 
 </script>
 <div>

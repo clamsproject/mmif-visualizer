@@ -1,5 +1,4 @@
 <div id="ocr_tab">
-
     {% for frame_num, frame in frames_pages[page_number] %}
         {% set filename = frame["id"] %}
         {% set id = frame["id"] %}
@@ -104,8 +103,6 @@ function changePage(page) {
         var data = {
             "vid_path": "{{vid_path}}",
             "frames_pages": "{{frames_pages}}",
-            "alignments": "{{alignments}}",
-            "text_docs": "{{text_docs}}",
             "page_number": parseInt("{{page_number}}"), 
         }
         if (page == BACKWARD) {

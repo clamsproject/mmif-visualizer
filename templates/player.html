@@ -35,6 +35,12 @@
         width: 100%;
         height: auto;
     }
+    .error {
+        background-color: #D72638;
+        color: #ffffff;
+        padding: 10px;
+        border-radius: 5px;
+    }
 </style>
 
 <body>
@@ -85,7 +91,7 @@
         <!-- navigation tabs for the visualizations (WEBVTT, Entities, etcetera) -->
         <ul class="nav nav-tabs">
           {% for annotation in annotations %}
-          <li class="nav-item">
+          <li class="nav-item {{ annotation[0] }}">
             <a class="nav-link" data-toggle="tab" href="#{{ annotation[0] }}">{{ annotation[0] }}</a>
           </li>
           {%  endfor %}
