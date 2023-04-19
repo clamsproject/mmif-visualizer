@@ -1,12 +1,19 @@
 import os
 import cv2
 from io import StringIO
+# from string import Template
+from collections import Counter
+
 import displacy
 import tempfile
 import re
 import json
 
 from flask import Flask, render_template
+from werkzeug.utils import secure_filename
+
+from mmif.serialize import Mmif, View
+from mmif.serialize.annotation import Text
 from mmif.vocabulary import AnnotationTypes
 from lapps.discriminators import Uri
 from iiif_utils import generate_iiif_manifest
@@ -20,7 +27,7 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 
 def get_alignments(alignment_view):
     vtt_file = tempfile.NamedTemporaryFile('w', dir="static/", suffix='.vtt', delete=False)
-    vtt_file.write("WEBVTT\n\n")
+    vtt_file.write("WebVTT\n\n")
     annotations = alignment_view.annotations
     # TODO: wanted to use "mmif.get_alignments(AnnotationTypes.TimeFrame, Uri.TOKEN)"
     # but that gave errors so I gave up on it
@@ -32,10 +39,8 @@ def get_alignments(alignment_view):
     for alignment in alignments:
         start_end_text = build_alignment(alignment, token_idx, timeframe_idx)
         if start_end_text is not None:
-            # VTT specifically requires timestamps expressed in miliseconds
-            # and must be be in one of these formats 
-            # mm:ss.ttt
-            # hh:mm:ss.ttt
+            # VTT specifically requires timestamps expressed in miliseconds and
+            # must be be in one of these formats: mm:ss.ttt or hh:mm:ss.ttt
             # (https://developer.mozilla.org/en-US/docs/Web/API/WebVTT_API)
             # ISO format can have up to 6 below the decimal point, on the other hand
             # Assuming here that start and end are in miliseconds
@@ -80,24 +85,7 @@ def get_media(mmif):
         elif doc_type == 'Audio':
             html = html_audio(doc_path)
         elif doc_type == 'Image':
-            # TODO: this gives you the last view with BoundingBoxes, should
-            # perhaps use get_views_contain() instead, should also select just
-            # the bounding boxes and add information from alignments to text
-            # documents
-            tbox_view = mmif.get_view_contains(str(AnnotationTypes.BoundingBox))
-            tbox_annotations = tbox_view.annotations
-            # For the boxes we pull some information from the annotation: the
-            # identifier, boxType and the (x,y,w,h) coordinates used by the
-            # Javascript code that draws the rectangle.
-            boxes = []
-            for a in tbox_annotations:
-                coordinates = a.properties["coordinates"]
-                x = coordinates[0][0]
-                y = coordinates[0][1]
-                w = coordinates[1][0] - x
-                h = coordinates[2][1] - y
-                box = [a.properties["id"], a.properties["boxType"], [x, y, w, h]]
-                boxes.append(box)
+            boxes = get_boxes(mmif)
             html = html_img(doc_path, boxes)
         media.append((doc_type, document.id, doc_path, html))
     manifest_filename = generate_iiif_manifest(mmif)
@@ -105,6 +93,28 @@ def get_media(mmif):
     temp = render_template("uv_player.html", manifest=man)
     media.append(('UV', "", "", temp))
     return media
+
+
+def get_boxes(mmif):
+    # TODO: this gives you the last view with BoundingBoxes, should
+    # perhaps use get_views_contain() instead, should also select just
+    # the bounding boxes and add information from alignments to text
+    # documents.
+    tbox_view = mmif.get_view_contains(str(AnnotationTypes.BoundingBox))
+    tbox_annotations = tbox_view.annotations
+    # For the boxes we pull some information from the annotation: the
+    # identifier, boxType and the (x,y,w,h) coordinates used by the
+    # Javascript code that draws the rectangle.
+    boxes = []
+    for a in tbox_annotations:
+        coordinates = a.properties["coordinates"]
+        x = coordinates[0][0]
+        y = coordinates[0][1]
+        w = coordinates[1][0] - x
+        h = coordinates[2][1] - y
+        box = [a.properties["id"], a.properties["boxType"], [x, y, w, h]]
+        boxes.append(box)
+    return boxes
 
 
 def get_document_type_short_form(document):
@@ -117,14 +127,16 @@ def get_document_type_short_form(document):
 def prep_annotations(mmif):
     """Prepare annotations from the views, and return a list of pairs of tabname
     and tab content. The first tab is alway the full MMIF pretty print."""
-    tabs = [("MMIF", "<pre>" + mmif.serialize(pretty=True) + "</pre>"),
+    tabs = [("Info", "<pre>" + create_info(mmif) + "</pre>"),
+            ("MMIF", "<pre>" + mmif.serialize(pretty=True) + "</pre>"),
+            ("Annotations", create_annotation_tables(mmif)),
             ("Interactive_MMIF", render_interactive_mmif(mmif))]
     # TODO: since this uses the same tab-name this will only show the same
     # stuff; it does a loop but for now we assume there is just one file with
     # alignments (generated by Kaldi)
     for fa_view in get_alignment_views(mmif):
         vtt_file = view_to_vtt(fa_view)
-        tabs.append(("WEBVTT", '<pre>' + open(vtt_file).read() + '</pre>'))
+        tabs.append(("WebVTT", '<pre>' + open(vtt_file).read() + '</pre>'))
     ner_views = get_ner_views(mmif)
     use_id = True if len(ner_views) > 1 else False
     for ner_view in ner_views:
@@ -151,6 +163,48 @@ def get_video_path(mmif):
         if file[0] == "Video":
             return file[2]
     return None    
+
+
+def create_info(mmif):
+    s = StringIO('Howdy')
+    for document in mmif.documents:
+        at_type = str(document.at_type).rsplit('/', 1)[-1]
+        location = document.location
+        s.write("%s  %s\n" % (at_type, location))
+    s.write('\n')
+    for view in mmif.views:
+        app = view.metadata.app
+        status = get_status(view)
+        s.write('%s  %s  %s  %d\n' % (view.id, app, status, len(view.annotations)))
+        if len(view.annotations) > 0:
+            s.write('\n')
+            types = Counter([str(a.at_type).rsplit('/', 1)[-1]
+                             for a in view.annotations])
+            for attype, count in types.items():
+                s.write('    %4d %s\n' % (count, attype))
+        s.write('\n')
+    return s.getvalue()
+
+
+def create_annotation_tables(mmif):
+    s = StringIO('Howdy')
+    for view in mmif.views:
+        status = get_status(view)
+        s.write('<p><b>%s  %s</b>  %s  %d annotations</p>\n'
+                % (view.id, view.metadata.app, status, len(view.annotations)))
+        s.write("<blockquote>\n")
+        s.write("<table cellspacing=0 cellpadding=5 border=1>\n")
+        for annotation in view.annotations:
+            s.write('  <tr>\n')
+            s.write('    <td>%s</td>\n' % annotation.id)
+            s.write('    <td>%s</td>\n' % str(annotation.at_type).split('/')[-1])
+            s.write('    <td>%s</td>\n' % get_properties(annotation))
+            s.write('  </tr>\n')
+        s.write("</table>\n")
+        s.write("</blockquote>\n")
+    return s.getvalue()
+    return '<pre>%s</pre>\n' % s.getvalue()
+
 
 
 def get_document_ids(view, annotation_type):
@@ -279,6 +333,20 @@ def create_ner_visualization(mmif, view):
     except KeyError:
         # the view's entities refer to more than one text document (tessearct)
         pass
+def get_status(view):
+    return 'ERROR' if 'message' in view.metadata.error else 'OKAY'
+
+
+def get_properties(annotation):
+    props = annotation.properties._serialize()
+    props.pop('id')
+    props_list = []
+    for prop in sorted(props):
+        val = props[prop]
+        if type(val) == Text:
+            val = val.value
+        props_list.append("%s=%s" % (prop, val))
+    return '{ %s }' % ', '.join(props_list)
 
 # OCR Tools ----------------------
 

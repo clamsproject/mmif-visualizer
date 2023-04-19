@@ -33,7 +33,7 @@
       "id": "v_0",
       "metadata": {
         "timestamp": "2020-11-11T19:17:09.499431",
-        "app": "http://mmif.clams.ai/apps/kaldi/0.1.0",
+        "app": "http://apps.clams.ai/apps/kaldi/0.1.0",
         "contains": {
           "http://mmif.clams.ai/0.4.0/vocabulary/TextDocument": {},
           "http://vocab.lappsgrid.org/Token": {},
@@ -18536,7 +18536,7 @@
       "id": "v_1",
       "metadata": {
         "timestamp": "2020-11-11T19:19:32.631941",
-        "app": "https://tools.clams.ai/spacy_nlp",
+        "app": "https://apps.clams.ai/spacy_nlp/0.3.1",
         "contains": {
           "http://vocab.lappsgrid.org/Token": {},
           "http://vocab.lappsgrid.org/Token#pos": {},
