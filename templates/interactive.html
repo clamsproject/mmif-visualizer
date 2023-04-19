@@ -70,17 +70,17 @@
     <button type="button" id="search_button">Search</button>
     <div id='tree'>
         <ul>
-        {% set cluster = namespace(colored=True) %}
+        {% set cluster = namespace(highlighted=False) %}
         {% for view in mmif.views %}
             <li data-jstree='{"type":"view"}'>{{view.metadata.app}} ({{view.id}})
                 <ul>
                     {% for annotation in view.annotations %}
-                        <li data-jstree='{"type": "{{"annotation" if cluster.colored else "annotation-highlighted"}}"}'>{{annotation.at_type}}
+                        <li data-jstree='{"type": "{{"annotation-highlighted" if cluster.highlighted and is_aligned else "annotation"}}"}'>{{annotation.at_type}}
                             <ul>
                                 <li data-jstree='{"type":"properties"}'>{{annotation.properties}}</li>
                             </ul>
                             {% if "Alignment" in annotation.at_type|string %}
-                                {% set cluster.colored = not cluster.colored %}
+                                {% set cluster.highlighted = not cluster.highlighted %}
                             {% endif %}
                         </li>
                         

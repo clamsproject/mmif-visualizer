@@ -237,20 +237,28 @@ def url2posix(path):
 # Interactive MMIF Tab -----------
 
 def render_interactive_mmif(mmif):
-    # organize_alignments(mmif)
-    return render_template('interactive.html', mmif=mmif)
+    return render_template('interactive.html', mmif=mmif, is_aligned=is_properly_aligned(mmif))
 
-# def organize_alignments(mmif):
-#     """Organize all alignments so they are directly adjacent to the elements they align"""
-#     for view in mmif.views:
-#         if any([str(at_type).endswith('Alignment') for at_type in view.metadata.contains]):
-#             organize(view.annotations)
+def is_properly_aligned(mmif):
+    """Check if Alignment placement is standard (for tree display)"""
+    for view in mmif.views:
+        if any([str(at_type).endswith('Alignment') for at_type in view.metadata.contains]):
+            if check_view_alignment(view.annotations) == False:
+                return False
+    return True
 
-# def organize(annotations):
-#     new_anno_list = []
-#     for annotation in annotations:
-#         new_anno_list.append(annotation)
-#     return new_anno_list
+def check_view_alignment(annotations):
+    anno_stack = []
+    for annotation in annotations:
+        if str(annotation.at_type).endswith('Alignment'):
+            anno_stack.insert(0, annotation.properties)
+        else:
+            anno_stack.append(annotation.id)
+        if len(anno_stack) == 3:
+            if not (anno_stack[0]["source"] in anno_stack and anno_stack[0]["target"] in anno_stack):
+                return False
+            anno_stack = []
+    return True
 
 # NER Tools ----------------------
 
