@@ -1,57 +1,63 @@
-<canvas id="imgCanvas" width="350" height="1000"></canvas>
+<canvas id="{{id}}" width="350" height="1000"></canvas>
 
-<script>	
 
-var boxes = $boxes;
+<script>
 
-var canvas = document.getElementById('imgCanvas');
-var context = canvas.getContext('2d');
-var imageObj = new Image();
+    drawImage();
 
-imageObj.src = '$filename';
+    function drawImage() {
+        var boxes = {{ boxes | tojson }};
 
-imageObj.onload = function() {
-    
-    var imgWidth = imageObj.naturalWidth;
-    var imgHeight = imageObj.naturalHeight;
-    var screenWidth  = canvas.width;
-    var screenHeight = canvas.height;
-    var scaleX = 1;
-    var scaleY = 1;
+        var canvas = document.getElementById('{{id}}');
+        var context = canvas.getContext('2d');
+        var imageObj = new Image();
 
-    if (imgWidth > screenWidth)
-	scaleX = screenWidth/imgWidth;
-    if (imgHeight > screenHeight)
-        scaleY = screenHeight/imgHeight;
+        imageObj.src = '{{filename}}';
 
-    var scale = scaleY;
+        imageObj.onload = function() {
+            
+            var imgWidth = imageObj.naturalWidth;
+            var imgHeight = imageObj.naturalHeight;
+            var screenWidth  = canvas.width;
+            var screenHeight = canvas.height;
+            var scaleX = 1;
+            var scaleY = 1;
 
-    if (scaleX < scaleY)
-        scale = scaleX;
-    if (scale < 1) {
-        imgHeight = imgHeight*scale;
-        imgWidth = imgWidth*scale; }
+            if (imgWidth > screenWidth)
+            scaleX = screenWidth/imgWidth;
+            if (imgHeight > screenHeight)
+                scaleY = screenHeight/imgHeight;
 
-    canvas.height = imgHeight;
-    canvas.width = imgWidth;
-    context.drawImage(imageObj, 0, 0,
-		      imageObj.naturalWidth, imageObj.naturalHeight, 0,0,
-		      imgWidth, imgHeight);
-    context.beginPath();
-    context.lineWidth = "4";
-    context.strokeStyle = "blue";
-    context.scale(scale, scale);
-    context.font = 'normal 16px serif';
+            var scale = scaleY;
 
-    for (var i=0; i < boxes.length; i++) {
-	var id = boxes[i][0];
-        var x = boxes[i][2][0];
-        var y = boxes[i][2][1];
-        var w = boxes[i][2][2];
-        var h = boxes[i][2][3];
-        context.fillText(id, x + 5, y + 15);
-        context.rect(x, y, w, h);
+            if (scaleX < scaleY)
+                scale = scaleX;
+            if (scale < 1) {
+                imgHeight = imgHeight*scale;
+                imgWidth = imgWidth*scale; }
+
+            canvas.height = imgHeight;
+            canvas.width = imgWidth;
+            context.drawImage(imageObj, 0, 0,
+                    imageObj.naturalWidth, imageObj.naturalHeight, 0,0,
+                    imgWidth, imgHeight);
+            context.beginPath();
+            context.lineWidth = "4";
+            context.strokeStyle = "blue";
+            context.scale(scale, scale);
+            context.font = 'normal 16px serif';
+
+            for (var i=0; i < boxes.length; i++) {
+            var id = boxes[i][0];
+                var x = boxes[i][2][0];
+                var y = boxes[i][2][1];
+                var w = boxes[i][2][2];
+                var h = boxes[i][2][3];
+                context.fillText(id, x + 5, y + 15);
+                context.rect(x, y, w, h);
+            }
+            context.stroke();
+        }   
+
     }
-    context.stroke();
-}
 </script>

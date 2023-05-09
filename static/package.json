@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "universalviewer": "^4.0.10",
+    "uv": "^1.3.1"
+  }
+}

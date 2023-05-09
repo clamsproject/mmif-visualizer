@@ -1,0 +1,93 @@
+<script
+	src="https://code.jquery.com/jquery-3.6.1.js"
+	integrity="sha256-3zlB5s2uwoUzrXK3BT7AX3FyvojsraNFxCc2vC/7pNI="
+	crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css" />
+
+<style>
+    #tree {
+        width: 100%
+    }
+    .highlighted {
+        background-color: #E8E8E8 !important;
+    }
+    .props {
+        background-color: inherit !important;
+    }
+    
+</style>
+
+<script>
+    treeLoaded = false;
+
+    // Lazy load JSTree element (for very large files)
+    $(".nav-item.Tree").click(function() {
+        if (treeLoaded)
+            return
+        treeLoaded = true;
+        loadJSTree();
+    })
+
+    function loadJSTree() {
+        $('#tree').jstree({
+        // Custom row styling with types;
+        // types assigned via HTML are given class attributes here for custom CSS
+        "types": {
+            "view" : {"icon": "fa fa-eye"},
+            "annotation-highlighted": {
+                "icon": "fa fa-pencil",
+                "li_attr": {"class": "highlighted"}
+            },
+            "annotation" : {"icon": "fa fa-pencil", "li_attr": {"id": "annotation"}},
+            "properties" : {
+                "icon": "fa fa-list",
+                "li_attr": {"class": "props"}}
+        },
+        "plugins": [ "types", "search"],
+        "search": {
+            "case_sensitive": false,
+            "show_only_matches": true,
+            "show_only_matches_children" : true
+        }
+        }) 
+
+        $("#search_button").click(function(){
+            $('#tree').jstree('search', $("#search_input").val());
+        });
+        $("#search_input").keypress(function(e){
+            if(e.which == 13) {
+                $("#search_button").click();
+            }
+        });
+
+    }
+
+</script>
+<div>
+    <input id="search_input" />
+    <button type="button" id="search_button">Search</button>
+    <div id='tree'>
+        <ul>
+        {% set cluster = namespace(highlighted=False) %}
+        {% for view in mmif.views %}
+            <li data-jstree='{"type":"view"}'>{{view.metadata.app}} ({{view.id}})
+                <ul>
+                    {% for annotation in view.annotations %}
+                        <li data-jstree='{"type": "{{"annotation-highlighted" if cluster.highlighted and is_aligned else "annotation"}}"}'>{{annotation.at_type}}
+                            <ul>
+                                <li data-jstree='{"type":"properties"}'>{{annotation.properties}}</li>
+                            </ul>
+                            {% if "Alignment" in annotation.at_type|string %}
+                                {% set cluster.highlighted = not cluster.highlighted %}
+                            {% endif %}
+                        </li>
+                        
+                    {% endfor %}
+                </ul>
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+</div>
