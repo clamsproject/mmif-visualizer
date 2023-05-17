@@ -96,16 +96,11 @@ def round_boxes(boxes):
     return rounded_boxes
 
 def get_ocr_views(mmif):
-    """Return OCR views, which have TextDocument and Alignment annotations, but no
-    other annotations."""
+    """Return OCR views, which have TextDocument, BoundingBox, and Alignment annotations"""
     views = []
-    # TODO: not sure why we use the full URL
-    needed_types = set([
-        "http://mmif.clams.ai/0.4.0/vocabulary/TextDocument",
-        "http://mmif.clams.ai/0.4.0/vocabulary/BoundingBox",
-        "http://mmif.clams.ai/0.4.0/vocabulary/Alignment" ])
+    needed_types = ["TextDocument", "BoundingBox", "Alignment"]
     for view in mmif.views:
-        annotation_types = view.metadata.contains.keys()
-        if needed_types.issubset(annotation_types) and len(annotation_types) == 3:
+        annotation_types = [str(url).split("/")[-1] for url in view.metadata.contains.keys()]
+        if needed_types == annotation_types:
             views.append(view)
     return views
