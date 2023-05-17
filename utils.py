@@ -194,17 +194,16 @@ def create_annotation_tables(mmif):
                 % (view.id, view.metadata.app, status, len(view.annotations)))
         s.write("<blockquote>\n")
         s.write("<table cellspacing=0 cellpadding=5 border=1>\n")
+        limit_len = lambda str : str[:500] + "  . . .  }" if len(str) > 500 else str
         for annotation in view.annotations:
             s.write('  <tr>\n')
             s.write('    <td>%s</td>\n' % annotation.id)
             s.write('    <td>%s</td>\n' % str(annotation.at_type).split('/')[-1])
-            s.write('    <td>%s</td>\n' % get_properties(annotation))
+            s.write('    <td>%s</td>\n' % limit_len(get_properties(annotation)))
             s.write('  </tr>\n')
         s.write("</table>\n")
         s.write("</blockquote>\n")
     return s.getvalue()
-    return '<pre>%s</pre>\n' % s.getvalue()
-
 
 
 def get_document_ids(view, annotation_type):
@@ -291,15 +290,17 @@ def url2posix(path):
 # Interactive MMIF Tab -----------
 
 def render_interactive_mmif(mmif):
-    return render_template('interactive.html', mmif=mmif, is_aligned=is_properly_aligned(mmif))
+    return render_template('interactive.html', mmif=mmif, aligned_views=get_aligned_views(mmif))
 
-def is_properly_aligned(mmif):
-    """Check if Alignment placement is standard (for tree display)"""
+# Functions for checking if view can be rendered with alignment highlighting
+def get_aligned_views(mmif):
+    """Return list of properly aligned views (for tree display)"""
+    aligned_views = []
     for view in mmif.views:
         if any([str(at_type).endswith('Alignment') for at_type in view.metadata.contains]):
-            if check_view_alignment(view.annotations) == False:
-                return False
-    return True
+            if check_view_alignment(view.annotations) == True:
+                aligned_views.append(view.id)
+    return aligned_views
 
 def check_view_alignment(annotations):
     anno_stack = []
@@ -310,6 +311,7 @@ def check_view_alignment(annotations):
             anno_stack.append(annotation.id)
         if len(anno_stack) == 3:
             if not (anno_stack[0]["source"] in anno_stack and anno_stack[0]["target"] in anno_stack):
+                print(anno_stack)
                 return False
             anno_stack = []
     return True
