@@ -120,7 +120,9 @@ def get_boxes(mmif):
 def get_document_type_short_form(document):
     """Returns 'Video', 'Text', 'Audio' or 'Image' from the document type of
     the document."""
-    document_type = os.path.split(str(document.at_type))[1]
+    # Remove trailing "/v1" in newer @types
+    at_type = re.sub(r"\/v\d*$", "", str(document.at_type))
+    document_type = os.path.split(at_type)[1]
     return document_type[:-8]
 
 
@@ -235,7 +237,6 @@ def get_alignment_views(mmif):
 # Remder Media as HTML ------------
 
 def html_video(vpath, vtt_srcview=None):
-    print(vpath)
     vpath = url2posix(vpath)
     html = StringIO()
     html.write('<video id="vid" controls>\n')
@@ -311,7 +312,6 @@ def check_view_alignment(annotations):
             anno_stack.append(annotation.id)
         if len(anno_stack) == 3:
             if not (anno_stack[0]["source"] in anno_stack and anno_stack[0]["target"] in anno_stack):
-                print(anno_stack)
                 return False
             anno_stack = []
     return True
