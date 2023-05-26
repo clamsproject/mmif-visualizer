@@ -30,19 +30,19 @@ def entity_dict(mmif, view, document_id, app_root):
     displacy_dict['ents'] = []
     for ann in view['annotations']:
         if ann.at_type == Uri.NE:
-            displacy_dict['ents'].append(entity(ann))
+            displacy_dict['ents'].append(entity(view, ann))
     return displacy_dict
 
 
 def get_text_documents(mmif):
     """Return a dictionary indexed on document identifiers (with the view identifier
     if needed) with text documents as the values."""
-    tds = [d for d in mmif.documents if str(d.at_type).endswith('TextDocument')]
+    tds = [d for d in mmif.documents if "TextDocument" in str(d.at_type)]
     tds = {td.id:td for td in tds}
     for view in mmif.views:
         # TODO: add check for TextDocument in metadata.contains (saves time)
         for annotation in view.annotations:
-            if str(annotation.at_type).endswith('TextDocument'):
+            if "TextDocument" in str(annotation.at_type):
                 tds["%s:%s" % (view.id, annotation.id)] = annotation
     return tds
 
@@ -74,7 +74,7 @@ def mmif_to_dict(mmif: Mmif):
     # to a TextDocument in the views or a set of TextDocuments in the views.
     transcript_location = None
     for document in mmif.documents:
-        if document.at_type.endswith('TextDocument'):
+        if "TextDocument" in document.at_type:
             transcript_location = document.location
     transcript_location = transcript_location
     displacy_dict = {}
@@ -85,13 +85,19 @@ def mmif_to_dict(mmif: Mmif):
         displacy_dict['ents'] = []
         for ann in ne_view['annotations']:
             if ann.at_type == Uri.NE:
-                displacy_dict['ents'].append(entity(ann))
+                displacy_dict['ents'].append(entity(ne_view, ann))
     return displacy_dict
 
 
-def entity(annotation: Annotation):
-    return {'start': annotation.properties['start'],
-            'end': annotation.properties['end'],
+def entity(view: View, annotation: Annotation):
+    if "targets" in annotation.properties:
+        start = min([view.annotations[target].properties["start"] for target in annotation.properties["targets"]])
+        end = max([view.annotations[target].properties["end"] for target in annotation.properties["targets"]])
+    else:
+        start = annotation.properties['start']
+        end = annotation.properties['end']
+    return {'start': start,
+            'end': end,
             'label': annotation.properties['category']}
 
 

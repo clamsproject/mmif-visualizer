@@ -31,9 +31,9 @@ def get_alignments(alignment_view):
     annotations = alignment_view.annotations
     # TODO: wanted to use "mmif.get_alignments(AnnotationTypes.TimeFrame, Uri.TOKEN)"
     # but that gave errors so I gave up on it
-    token_idx = {a.id:a for a in annotations if str(a.at_type).endswith('Token')}
-    timeframe_idx = {a.id:a for a in annotations if str(a.at_type).endswith('TimeFrame')}
-    alignments = [a for a in annotations if str(a.at_type).endswith('Alignment')]
+    token_idx = {a.id:a for a in annotations if "Token" in str(a.at_type)}
+    timeframe_idx = {a.id:a for a in annotations if "TimeFrame" in str(a.at_type)}
+    alignments = [a for a in annotations if "Alignment" in str(a.at_type)]
     vtt_start = None
     texts = []
     for alignment in alignments:
@@ -212,7 +212,7 @@ def get_document_ids(view, annotation_type):
     metadata = view.metadata.contains.get(annotation_type)
     ids = set([metadata['document']]) if 'document' in metadata else set()
     for annotation in view.annotations:
-        if str(annotation.at_type).endswith(str(annotation_type)):
+        if str(annotation_type) in str(annotation.at_type):
             try:
                 ids.add(annotation.properties["document"])
             except KeyError:
@@ -298,7 +298,7 @@ def get_aligned_views(mmif):
     """Return list of properly aligned views (for tree display)"""
     aligned_views = []
     for view in mmif.views:
-        if any([str(at_type).endswith('Alignment') for at_type in view.metadata.contains]):
+        if any(["Alignment" in str(at_type) for at_type in view.metadata.contains]):
             if check_view_alignment(view.annotations) == True:
                 aligned_views.append(view.id)
     return aligned_views
@@ -306,7 +306,7 @@ def get_aligned_views(mmif):
 def check_view_alignment(annotations):
     anno_stack = []
     for annotation in annotations:
-        if str(annotation.at_type).endswith('Alignment'):
+        if "Alignment" in str(annotation.at_type):
             anno_stack.insert(0, annotation.properties)
         else:
             anno_stack.append(annotation.id)
@@ -332,7 +332,7 @@ def create_ner_visualization(mmif, view):
         # all the view's named entities refer to the same text document (kaldi)
         document_ids = get_document_ids(view, Uri.NE)
         return displacy.visualize_ner(mmif, view, document_ids[0], app.root_path)
-    except KeyError:
+    except KeyError as e:
         # the view's entities refer to more than one text document (tessearct)
         pass
 def get_status(view):
@@ -357,17 +357,17 @@ def prepare_ocr_visualization(mmif, view):
     frames, text_docs, alignments = {}, {}, {}
     for anno in view.annotations:
         try:
-            if str(anno.at_type).endswith('BoundingBox'):
+            if "BoundingBox" in str(anno.at_type):
                 frames = add_bounding_box(anno, frames)
 
-            elif str(anno.at_type).endswith('TextDocument'):
+            elif "TextDocument" in str(anno.at_type):
                 t = anno.properties["text_value"]
                 if t:
                     text_id = anno.properties["id"]
                     # Format string so it is JSON-readable
                     text_docs[text_id] = re.sub(r'([\\\/\|\"\'])', r'\1 ', t)
 
-            elif str(anno.at_type).endswith('Alignment'):
+            elif "Alignment" in str(anno.at_type):
                 source = anno.properties["source"]
                 target = anno.properties["target"]
                 alignments[source] = target
