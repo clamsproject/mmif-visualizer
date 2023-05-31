@@ -66,6 +66,7 @@ def render_ocr(vid_path, frames_pages, page_number):
         _, frame_cap = cv2_vid.read()
         with tempfile.NamedTemporaryFile(
             prefix="/app/static/tmp/", suffix=".jpg", delete=False) as tf:
+            print(tf.name)
             cv2.imwrite(tf.name, frame_cap)
             # "id" is just the name of the temp image file
             frame["id"] = tf.name[12:]            
