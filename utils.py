@@ -18,6 +18,7 @@ from mmif.vocabulary import AnnotationTypes
 from lapps.discriminators import Uri
 from iiif_utils import generate_iiif_manifest
 from ocr import *
+from datetime import timedelta
 
 
 # Get Properties from MMIF file ---
@@ -27,8 +28,10 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 
 def get_alignments(alignment_view):
     vtt_file = tempfile.NamedTemporaryFile('w', dir="static/", suffix='.vtt', delete=False)
-    vtt_file.write("WebVTT\n\n")
+    vtt_file.write("WEBVTT\n\n")
     annotations = alignment_view.annotations
+    timeframe_at_type = [at_type for at_type in alignment_view.metadata.contains if at_type.shortname == "TimeFrame" ][0]
+    timeunit = alignment_view.metadata.contains[timeframe_at_type]["timeUnit"]
     # TODO: wanted to use "mmif.get_alignments(AnnotationTypes.TimeFrame, Uri.TOKEN)"
     # but that gave errors so I gave up on it
     token_idx = {a.id:a for a in annotations if a.at_type.shortname == "Token"}
@@ -45,11 +48,13 @@ def get_alignments(alignment_view):
             # ISO format can have up to 6 below the decimal point, on the other hand
             # Assuming here that start and end are in miliseconds
             start, end, text = start_end_text
+            start_kwarg, end_kwarg = {timeunit: float(start)}, {timeunit: float(end)}
+            start, end = timedelta(**start_kwarg), timedelta(**end_kwarg)
             if not vtt_start:
-                vtt_start = f'{start // 60000:02d}:{start % 60000 // 1000:02d}.{start % 1000:03d}'
+                vtt_start = f'{start.seconds // 3600 :02d}:{start.seconds:02d}.{start.microseconds // 1000 :03d}'
             texts.append(text)
             if len(texts) > 8:
-                vtt_end = f'{end // 60000:02d}:{end % 60000 // 1000:02d}.{end % 1000:03d}'
+                vtt_end = f'{end.seconds // 3600 :02d}:{end.seconds:02d}.{end.microseconds // 1000 :03d}'
                 vtt_file.write(f'{vtt_start} --> {vtt_end}\n{" ".join(texts)}\n\n')
                 vtt_start = None
                 texts = []
@@ -224,7 +229,7 @@ def get_alignment_views(mmif):
     needed_types = set(['TextDocument', 'Token', 'TimeFrame', 'Alignment'])
     for view in mmif.views:
         annotation_types = view.metadata.contains.keys()
-        annotation_types = [os.path.split(str(at))[-1] for at in annotation_types]
+        annotation_types = [at.shortname for at in annotation_types]
         if needed_types.issubset(annotation_types):
             views.append(view)
     return views
@@ -243,7 +248,7 @@ def html_video(vpath, vtt_srcview=None):
         # use only basename because "static" directory is mapped to '' route by
         # `static_url_path` param
         src = os.path.basename(vtt_path)
-        html.write(f'    <track kind="subtitles" srclang="en" src="{src}" default>\n')
+        html.write(f'    <track kind="subtitles" srclang="en" src="{src}" label="English" default>\n')
     html.write("</video>\n")
     return html.getvalue()
 
@@ -295,7 +300,7 @@ def get_aligned_views(mmif):
     """Return list of properly aligned views (for tree display)"""
     aligned_views = []
     for view in mmif.views:
-        if any([at_type.shortname == "Token" for at_type in view.metadata.contains]):
+        if any([at_type.shortname == "Alignment" for at_type in view.metadata.contains]):
             if check_view_alignment(view.annotations) == True:
                 aligned_views.append(view.id)
     return aligned_views
@@ -308,7 +313,7 @@ def check_view_alignment(annotations):
         else:
             anno_stack.append(annotation.id)
         if len(anno_stack) == 3:
-            if type(anno_stack[0] == str) or not (anno_stack[0]["source"] in anno_stack and anno_stack[0]["target"] in anno_stack):
+            if type(anno_stack[0]) == str or not (anno_stack[0]["source"] in anno_stack and anno_stack[0]["target"] in anno_stack):
                 return False
             anno_stack = []
     return True
