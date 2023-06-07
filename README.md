@@ -90,9 +90,9 @@ This directory contains an example MMIF file in `input/whisper-spacy.json`. This
 2. service-mbrs-ntscrm-01181182.wav
 3. service-mbrs-ntscrm-01181182.txt
 
-These files can be found in a compressed folder at `/input/example_files.zip`.  They can be extracted anywhere on the host machine, as long as they are placed in the subdirectories `video`, `audio`, and `text` respectively.
+These files can be found in a compressed folder at `/input/example_files.zip`.  They can be extracted anywhere on the host machine, as long as they are placed in the subdirectories `video`, `audio`, and `text` respectively. (e.g. `/Users/Shared/archive/video`, etc.)
 
-According to the MMIF file, those three files should be found in the `/data` directory. The Flask server will look for these files in `static/data/video`, `static/data/audio` and `static/data/text`, amd those directories should point at the appropriate location:
+According to the MMIF file, those three files should be found in their respective subdirectories in `/data`. The Flask server will look for these files in `static/data/video`, `static/data/audio` and `static/data/text`, amd those directories should point at the appropriate location:
 
 - If you run the visualizer in a Docker container, then the `-v` option in the docker-run command is used to mount the local data directory `/Users/shared/archive` to the `/data` directory on the container and the `static/data` symlink already points to that.
 - If you run the visualizer on your local machine without using a container, then you have a couple of options (where you may need to remove the current link first):
@@ -100,4 +100,3 @@ According to the MMIF file, those three files should be found in the `/data` dir
     `$> ln -s /Users/Shared/archive/ static/data`
   - Copy the contents of `/Users/Shared/archive` into `static/data`.
   - You could choose to copy the data to any spot in the `static` folder but then you would have to edit the MMIF input file.
-
