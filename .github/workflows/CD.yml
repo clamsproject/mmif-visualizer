@@ -15,4 +15,6 @@ on:
 jobs:
   build:
     name: 🔨 Build and deploy to ghcr
-    uses: clamsproject/.github/.github/workflows/app-container.yml@main
+    uses: clamsproject/.github/.github/workflows/app-container.yml@inputs.file
+    with:
+      file: Dockerfile
