@@ -90,7 +90,7 @@ This repository contains an example MMIF file in `input/whisper-spacy.json`. Thi
 2. service-mbrs-ntscrm-01181182.wav
 3. service-mbrs-ntscrm-01181182.txt
 
-These files can be found in a compressed folder at `/input/example_files.zip`.  They can be extracted anywhere on the host machine, as long as they are placed in the subdirectories `video`, `audio`, and `text` respectively. (e.g. `/Users/Shared/archive/video`, etc.)
+These files can be found in the directory `input/example-documents`.  They can be moved anywhere on the host machine, as long as they are placed in the subdirectories `video`, `audio`, and `text` respectively. (e.g. `/Users/Shared/archive/video`, etc.)
 
 According to the MMIF file, those three files should be found in their respective subdirectories in `/data`. The Flask server will look for these files in `static/data/video`, `static/data/audio` and `static/data/text`, amd those directories should point at the appropriate location:
 
