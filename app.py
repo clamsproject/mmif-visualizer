@@ -35,8 +35,11 @@ def upload():
     # unavailable because no secret key was set). This was solved in the
     # __main__ block by setting a key.
     if request.method == 'POST':
-        # check if the post request has the file part
-        if 'file' not in request.files:
+        # Check if request is coming from elasticsearch
+        if 'data' in request.form:
+            return render_mmif(request.form['data'])
+        # Otherwise, check if the post request has the file part
+        elif 'file' not in request.files:
             flash('WARNING: post request has no file part')
             return redirect(request.url)
         file = request.files['file']
