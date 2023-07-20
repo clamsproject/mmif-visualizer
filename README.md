@@ -1,19 +1,28 @@
 # The MMIF Visualization Server
 
-This application creates an HTML server that visualizes annotation components in a [MMIF](https://mmif.clams.ai) file. Supported annotations are:
+This application creates an HTML server that visualizes annotation components in a [MMIF](https://mmif.clams.ai) file. It contains the following visualizations for any valid MMIF:
 
-- Video or Audio file player with HTML5.
-- [WebVTT](https://www.w3.org/TR/webvtt1/) for showing alignments.
+- Video or Audio file player with HTML5 (assuming file refers to video and/or audio document).
 - Pretty-printed MMIF contents.
-- Javascript for bounding boxes.
-- Named entity annotations with [displaCy.](https://explosion.ai/demos/displacy-ent)
+- Interactive, searchable MMIF tree view with [JSTree](https://www.jstree.com/).
+- Embedded [Universal Viewer](https://universalviewer.io/) (assuming file refers to video and/or image document).
+
+
+The application also includes tailored visualizations depending on the annotations present in the input MMIF:
+| Visualization | Supported CLAMS apps |
+|---|---|
+| [WebVTT](https://www.w3.org/TR/webvtt1/) for showing alignments of video captions. | [Whisper](https://github.com/clamsproject/app-whisper-wrapper), [Kaldi](https://github.com/clamsproject/app-aapb-pua-kaldi-wrapper) |
+| Javascript bounding boxes for image and OCR annotations. | [Tesseract](https://github.com/clamsproject/app-tesseractocr-wrapper), [EAST](https://github.com/clamsproject/app-east-textdetection) |
+| Named entity annotations with [displaCy.](https://explosion.ai/demos/displacy-ent) | [SPACY](https://github.com/clamsproject/app-spacy-wrapper) |                                                                        |
+
+
 
 Requirements:
 
 - A command line interface.
 - Git (to get the code).
-- [Docker](https://www.docker.com/)  (if you run the visualizer using Docker).
-- Python 3.6 or later (if you want to run the server without Docker).
+- [Docker](https://www.docker.com/) or [Podman](https://podman.io/) (if you run the visualizer in a container).
+- Python 3.6 or later (if you want to run the server containerless).
 
 To get this code if you don't already have it:
 
@@ -23,12 +32,12 @@ $ git clone https://github.com/clamsproject/mmif-visualizer
 
 
 
-## Running the server in a Docker container
+## Running the server in a container
 
-Download or clone this repository and build an image using the `Dockerfile` (you may use another name for the -t parameter, for this example we use `clams-mmif-visualizer` throughout).
+Download or clone this repository and build an image using the `Dockerfile` (you may use another name for the -t parameter, for this example we use `clams-mmif-visualizer` throughout). **NOTE**: if using podman, just substitute `docker` for `podman` in the following commands.
 
 ```bash
-$ docker build -t clams-mmif-visualizer .
+$ docker build . -f Containerfile -t clams-mmif-visualizer
 ```
 
 In these notes we assume that the data are in a local directory named `/Users/Shared/archive` with sub directories `audio`, `image`, `text` and `video` (those subdirectories are standard in CLAMS, but the parent directory could be any directory depending on your local set up). We can now run a Docker container with
@@ -56,7 +65,7 @@ With this, the mounted directory `/data` in the container is accessable from ins
 
 
 
-## Running the server without Docker
+## Running the server without Docker/Podman
 
 First install the python dependencies listed in `requirements.txt`:
 

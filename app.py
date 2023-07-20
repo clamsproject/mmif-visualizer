@@ -19,13 +19,11 @@ def index():
 def ocrpage():
     data = request.form
     try:
-        # print(html.unescape(data['frames_pages']))
         frames_pages = eval(html.unescape(data['frames_pages']))
         page_number = int(data['page_number'])
 
         return (render_ocr(data['vid_path'], frames_pages, page_number))
     except Exception as e:
-        print(html.unescape(data['frames_pages']))
         return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
         pass
 

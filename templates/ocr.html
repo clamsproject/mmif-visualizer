@@ -13,10 +13,12 @@
                     <h4>
                         frame: {{frame_num}}<br>
                         timestamp: <a class="timestamp" onclick="SetCurTime('{{secs}}')">{{frame["timestamp"]}}</a><br>
-                        text detected:<br>
-                        {% for text in frame["text"] %}
-                        &emsp;{{text}}<br>
-                        {% endfor %}
+                        {% if frame["text"] %}
+                            text detected:<br>
+                            {% for text in frame["text"] %}
+                                &emsp;{{text}}<br>
+                            {% endfor %}
+                        {% endif %}
                     </h4>
                 </div>
             </div>

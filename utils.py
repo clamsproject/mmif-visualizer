@@ -357,10 +357,13 @@ def get_properties(annotation):
 def prepare_ocr_visualization(mmif, view):
     """ Visualize OCR by extracting image frames with BoundingBoxes from video"""
     frames, text_docs, alignments = {}, {}, {}
+    vid_path = get_video_path(mmif)
+    cv2_vid = cv2.VideoCapture(vid_path)
+    fps = cv2_vid.get(cv2.CAP_PROP_FPS)
     for anno in view.annotations:
         try:
             if anno.at_type.shortname == "BoundingBox":
-                frames = add_bounding_box(anno, frames)
+                frames = add_bounding_box(anno, frames, fps)
 
             elif anno.at_type.shortname == "TextDocument":
                 t = anno.properties["text_value"]
@@ -379,10 +382,8 @@ def prepare_ocr_visualization(mmif, view):
             pass
 
     # Generate pages (necessary to reduce IO cost) and render
-    vid_path = get_video_path(mmif)
-    cv2_vid = cv2.VideoCapture(vid_path)
-    fps = cv2_vid.get(cv2.CAP_PROP_FPS)
     frames_list = [(k, v) for k, v in frames.items()]
-    frames_list = align_annotations(frames_list, alignments, text_docs, fps)
+    if any(at_type.shortname == "Alignment" for at_type in view.metadata.contains):
+        frames_list = align_annotations(frames_list, alignments, text_docs)
     frames_pages = paginate(frames_list)
     return render_ocr(vid_path, frames_pages, 0)

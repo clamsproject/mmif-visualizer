@@ -6,8 +6,8 @@ import json
 from flask import render_template
 
 
-def add_bounding_box(anno, frames):
-    frame_num = anno.properties["frame"]
+def add_bounding_box(anno, frames, fps):
+    frame_num = anno.properties.get("frame") or anno.properties.get("timePoint")
     box_id = anno.properties["id"]
     boxType = anno.properties["boxType"]
     coordinates = anno.properties["coordinates"]
@@ -21,17 +21,18 @@ def add_bounding_box(anno, frames):
         frames[frame_num]["bb_ids"].append(box_id)
     else:
         frames[frame_num] = {"boxes": [box], "text": [], "bb_ids": [box_id], "timestamp": None, "secs": None, "repeat": False}
+    if fps:
+        secs = int(frame_num/fps)
+        frames[frame_num]["timestamp"] = str(datetime.timedelta(seconds=secs))
+        frames[frame_num]["secs"] = secs
+
     return frames
 
 
-def align_annotations(frames_list, alignments, text_docs, fps):
+def align_annotations(frames_list, alignments, text_docs):
     """Link alignments with frames"""
     prev_frame = None
     for frame_num, frame in frames_list:
-        if fps:
-            secs = int(frame_num/fps)
-            frame["timestamp"] = str(datetime.timedelta(seconds=secs))
-            frame["secs"] = secs
         for box_id in frame["bb_ids"]:
             text_id = alignments[box_id]
             frame["text"].append(text_docs[text_id])
@@ -98,9 +99,8 @@ def round_boxes(boxes):
 def get_ocr_views(mmif):
     """Return OCR views, which have TextDocument, BoundingBox, and Alignment annotations"""
     views = []
-    needed_types = ["TextDocument", "BoundingBox", "Alignment"]
+    ocr_apps = ["east-textdetection", "tesseract"]
     for view in mmif.views:
-        annotation_types = [str(url).split("/")[-1] for url in view.metadata.contains.keys()]
-        if needed_types == annotation_types:
+        if any([view.metadata.app.find(ocr_app) for ocr_app in ocr_apps]):
             views.append(view)
     return views
