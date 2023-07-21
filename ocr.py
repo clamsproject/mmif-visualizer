@@ -2,45 +2,73 @@ import datetime
 import cv2
 import tempfile
 import json
+import re
 
 from flask import render_template
 
 
-def add_bounding_box(anno, frames, fps):
-    frame_num = anno.properties.get("frame") or anno.properties.get("timePoint")
-    box_id = anno.properties["id"]
-    boxType = anno.properties["boxType"]
-    coordinates = anno.properties["coordinates"]
-    x = coordinates[0][0]
-    y = coordinates[0][1]
-    w = coordinates[3][0] - x
-    h = coordinates[3][1] - y
-    box = [box_id, boxType, [x, y, w, h]]
-    if frame_num in frames.keys():
-        frames[frame_num]["boxes"].append(box)
-        frames[frame_num]["bb_ids"].append(box_id)
+class OCRFrame():
+    """Class representing an (aligned or otherwise) set of OCR annotations for a single frame"""
+
+    def __init__(self, anno, fps):
+        self.text = []
+        self.fps = fps
+        self.boxes = []
+        self.anno_ids = []
+        self.timestamp = None
+        self.secs = None
+        self.repeat = False
+        self.frame_num = None
+        self.update(anno)
+
+    def get_frame_num(self):
+        return self.frame_num
+
+    def update(self, anno):
+            if anno.at_type.shortname == "BoundingBox":
+                self.add_bounding_box(anno)
+
+            elif anno.at_type.shortname == "TextDocument":
+                t = anno.properties["text_value"]
+                if t:
+                    self.text.append(re.sub(r'([\\\/\|\"\'])', r'\1 ', t))
+
+    def add_bounding_box(self, anno):
+        self.frame_num = anno.properties.get("frame") or anno.properties.get("timePoint")
+        box_id = anno.properties["id"]
+        boxType = anno.properties["boxType"]
+        coordinates = anno.properties["coordinates"]
+        x = coordinates[0][0]
+        y = coordinates[0][1]
+        w = coordinates[3][0] - x
+        h = coordinates[3][1] - y
+        box = [box_id, boxType, [x, y, w, h]]
+        self.boxes.append(box)
+        self.anno_ids.append(box_id)
+        if self.fps:
+            secs = int(self.frame_num/self.fps)
+            self.timestamp = str(datetime.timedelta(seconds=secs))
+            self.secs = secs
+
+
+def get_ocr_frames(view, fps):
+    frames = {}
+    full_alignment_type = [at_type for at_type in view.metadata.contains if at_type.shortname == "Alignment"]
+    # If view contains alignments
+    if full_alignment_type:
+        for alignment in view.get_annotations(full_alignment_type[0]):
+            source = view.get_annotation_by_id(alignment.properties["source"])
+            target = view.get_annotation_by_id(alignment.properties["target"])
+            frame = OCRFrame(source, fps)
+            frame_num = frame.frame_num
+            if frame_num in frames.keys():
+                frames[frame_num].update(target) if source in frames[frame_num].anno_ids else frames[frame_num].update(source)
+            else:
+                frame.update(target)
+                frames[frame_num] = frame
     else:
-        frames[frame_num] = {"boxes": [box], "text": [], "bb_ids": [box_id], "timestamp": None, "secs": None, "repeat": False}
-    if fps:
-        secs = int(frame_num/fps)
-        frames[frame_num]["timestamp"] = str(datetime.timedelta(seconds=secs))
-        frames[frame_num]["secs"] = secs
-
+        frames = [OCRFrame(annotation, fps) for annotation in view.get_annotations()]
     return frames
-
-
-def align_annotations(frames_list, alignments, text_docs):
-    """Link alignments with frames"""
-    prev_frame = None
-    for frame_num, frame in frames_list:
-        for box_id in frame["bb_ids"]:
-            text_id = alignments[box_id]
-            frame["text"].append(text_docs[text_id])
-        if is_duplicate_ocr_frame(frame, prev_frame):
-            frame["repeat"] = True
-        prev_frame = frame
-    return frames_list
-
 
 def paginate(frames_list):
     """Generate pages from a list of frames"""
