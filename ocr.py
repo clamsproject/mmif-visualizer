@@ -169,7 +169,7 @@ def round_boxes(boxes):
 def get_ocr_views(mmif):
     """Return OCR views, which have TextDocument, BoundingBox, and Alignment annotations"""
     views = []
-    ocr_apps = ["east-textdetection", "tesseract", "chyron-text-recognition"]
+    ocr_apps = ["east-textdetection", "tesseract", "chyron-text-recognition", "slatedetection", "barsdetection"]
     for view in mmif.views:
         if any([ocr_app in view.metadata.app for ocr_app in ocr_apps]):
             views.append(view)

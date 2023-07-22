@@ -93,6 +93,9 @@
     #page-buttons {
         margin-top: 20px
     }
+    #page-input {
+        width: 30px;
+    }
     .page-button {
         margin-right: 10px
     }
@@ -126,7 +129,8 @@ function changePage(page) {
         else {
             data["page_number"] = page;
         }
-        $.ajax({
+        if (data["page_number"] >= 0 && data["page_number"] < parseInt("{{n_pages}}")) {
+            $.ajax({
             type:'POST',
             url:'/ocrpage',
             contentType: "application/json",
@@ -135,12 +139,17 @@ function changePage(page) {
               $('#ocr_tab').parent().html(res_html);
             }
         })
+        }
     }
   
     function SetCurTime(timeValue) {
         const vid = document.getElementById("vid");
         vid.currentTime = timeValue;
     }
+
+    function enterPageNumber() {
+        changePage(document.getElementById('page-input').value-1)
+        }
 
     $(document).ready(function() {
         
@@ -166,20 +175,28 @@ function changePage(page) {
         $("#page-buttons").each(function() {
             page_number = parseInt("{{page_number}}")
             n_pages = parseInt("{{n_pages}}")
+
             if (page_number > 0) {
+                $(this).append(`<button class="page-button" onClick=changePage(0)>\<\<</button>`)
                 $(this).append(`<button class="page-button" onClick=changePage(${-1})>\<</button>`)
             }
-            for (var i = 0; i < n_pages; i++) {
+
+            lower_bound = page_number < 6 ? 0 : page_number-5;
+            upper_bound = n_pages - page_number < 7 ? n_pages : page_number+6
+            for (var i = lower_bound; i < upper_bound; i++) {
                 var id = ""
                 if (i == page_number) {
                     id = "cur-page-button"
                 }
                 $(this).append(`<button class="page-button" id="${id}" onClick=changePage(${i})>${i+1}</button>`)
             }
+
             if (page_number < n_pages-1) {
                 $(this).append(`<button class="page-button" onClick=changePage(${-2})>\></button>`)
+                $(this).append(`<button class="page-button" onClick=changePage(${n_pages-1})>\>\></button>`)
             }
-        })
 
+            $(this).append(`<input id="page-input" onKeyPress="if(event.keyCode==13) enterPageNumber();" />`)
+        })
     })  
   </script>
