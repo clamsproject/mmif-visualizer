@@ -1,5 +1,5 @@
 <div id="ocr_tab">
-    {% for frame_num, frame in frames_pages[page_number] %}
+    {% for frame_num, frame in page %}
         {% set filename = frame["id"] %}
         {% set id = frame["id"] %}
         {% set boxes = frame["boxes"] %}
@@ -24,7 +24,7 @@
             </div>
         </div>
     {% endfor %}
-    <div id="page-buttons" n_pages="{{frames_pages | length}}">
+    <div id="page-buttons">
     </div>
 
 </div>
@@ -101,11 +101,9 @@ BACKWARD = -1
 FORWARD = -2
 
 function changePage(page) {
-        var pageChange
         var data = {
             "vid_path": "{{vid_path}}",
-            "frames_pages": "{{frames_pages}}",
-            "page_number": parseInt("{{page_number}}"), 
+            "page_number": parseInt("{{page_number}}")
         }
         if (page == BACKWARD) {
             data["page_number"] -= 1
@@ -119,7 +117,8 @@ function changePage(page) {
         $.ajax({
             type:'POST',
             url:'/ocrpage',
-            data: data,
+            contentType: "application/json",
+            data: JSON.stringify(data),
             success: function(res_html){
               $('#ocr_tab').parent().html(res_html);
             }
@@ -154,10 +153,10 @@ function changePage(page) {
 
         $("#page-buttons").each(function() {
             page_number = parseInt("{{page_number}}")
+            n_pages = parseInt("{{n_pages}}")
             if (page_number > 0) {
                 $(this).append(`<button class="page-button" onClick=changePage(${-1})>\<</button>`)
             }
-            n_pages = $(this).attr("n_pages");
             for (var i = 0; i < n_pages; i++) {
                 var id = ""
                 if (i == page_number) {

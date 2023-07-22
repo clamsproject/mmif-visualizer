@@ -8,8 +8,10 @@ import displacy
 import tempfile
 import re
 import json
+import html
 
 from flask import Flask, render_template
+from flask_session import Session
 from werkzeug.utils import secure_filename
 
 from mmif.serialize import Mmif, View
@@ -25,6 +27,7 @@ from datetime import timedelta
 
 # these two static folder-related params are important, do not remove
 app = Flask(__name__, static_folder='static', static_url_path='')
+app.secret_key = 'your_secret_key_here'
 
 def get_alignments(alignment_view):
     vtt_file = tempfile.NamedTemporaryFile('w', dir="static/", suffix='.vtt', delete=False)
@@ -365,5 +368,8 @@ def prepare_ocr_visualization(mmif, view):
 
     # Generate pages (necessary to reduce IO cost) and render
     frames_list = [(k, vars(v)) for k, v in ocr_frames.items()]
+    find_duplicates(frames_list)
     frames_pages = paginate(frames_list)
-    return render_ocr(vid_path, frames_pages, 0)
+    # Save page list as temp file
+    save_json(frames_pages)
+    return render_ocr(vid_path, 0)

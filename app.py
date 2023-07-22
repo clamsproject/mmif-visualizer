@@ -4,8 +4,9 @@ import secrets
 import html
 import datetime
 import ast
+import json
 
-from flask import request, render_template, flash, redirect, send_from_directory
+from flask import request, render_template, flash, redirect, send_from_directory, session
 from werkzeug.utils import secure_filename
 from mmif.serialize import Mmif
 
@@ -17,12 +18,10 @@ def index():
 
 @app.route('/ocrpage', methods=['POST'])
 def ocrpage():
-    data = request.form
+    data = request.json
     try:
-        frames_pages = eval(html.unescape(data['frames_pages']))
-        page_number = int(data['page_number'])
-
-        return (render_ocr(data['vid_path'], frames_pages, page_number))
+        page_number = data["page_number"]
+        return (render_ocr(data['vid_path'], page_number))
     except Exception as e:
         return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
         pass
@@ -66,12 +65,6 @@ def render_mmif(mmif_str):
     annotations = prep_annotations(mmif)
     return render_template('player.html',
                            mmif=mmif, media=media, annotations=annotations)
-
-
-# Not sure what this was for, it had a route /display, but that did not work
-# def display_file():
-#    mmif_str = requests.get(request.args["file"]).text
-#    return display_mmif(mmif_str)
 
 
 if __name__ == '__main__':
