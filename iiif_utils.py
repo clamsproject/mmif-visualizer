@@ -90,7 +90,6 @@ def build_document_url(document):
     symlink is correctly set.
     '''
     location = document.location
-    print("LOCATION IS", location, "----------------------")
     if location.startswith("file://"):
         location = document.location[7:]
     file_path = os.path.join("data", "video", os.path.basename(location))

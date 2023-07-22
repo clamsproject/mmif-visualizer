@@ -11,8 +11,20 @@
                 {% include "image.html" %}
                 <div>
                     <h4>
-                        frame: {{frame_num}}<br>
-                        timestamp: <a class="timestamp" onclick="SetCurTime('{{secs}}')">{{frame["timestamp"]}}</a><br>
+                        {% if frame["frame_num"] %}
+                            frame: {{frame["frame_num"]}}<br>
+                        {% endif %}
+                        {% if frame["range"] %}
+                            frames: {{frame["range"][0]}} - {{frame["range"][1]}}<br>
+                        {% endif %}
+                        {% if frame["timestamp"] %}
+                            timestamp: <a class="timestamp" onclick="SetCurTime('{{secs}}')">{{frame["timestamp"]}}</a><br>
+                        {% endif %}
+                        {% if frame["timestamp_range"] %}
+                            {% set sec_range = frame["sec_range"] %}
+                            timestamps: <a class="timestamp" onclick="SetCurTime('{{sec_range[0]}}')">{{frame["timestamp_range"][0]}}</a> - <a class="timestamp" onclick="SetCurTime('{{sec_range[1]}}')">{{frame["timestamp_range"][1]}}</a><br>
+                        {% endif %}
+
                         {% if frame["text"] %}
                             text detected:<br>
                             {% for text in frame["text"] %}

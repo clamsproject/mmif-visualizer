@@ -22,6 +22,8 @@ class OCRFrame():
         self.repeat = False
         self.frame_num = None
         self.range = None
+        self.timestamp_range = None
+        self.sec_range = None
 
         self.update(anno)
 
@@ -56,8 +58,14 @@ class OCRFrame():
             self.secs = secs
 
     def add_timeframe(self, anno):
+        start, end = anno.properties.get('start'), anno.properties.get('end')
+        self.range = (start, end)
+        if self.fps:
+            start_secs, end_secs = int(start/self.fps), int(end/self.fps)
+            self.timestamp_range = (str(datetime.timedelta(seconds=start_secs)), str(datetime.timedelta(seconds=end_secs)))
+            self.sec_range = (start_secs, end_secs)
+
         # self.range = f"{anno.properties.get('start')}-{anno.properties.get('end')}"
-        self.range = anno.properties.get('start')
 
 
 def get_ocr_frames(view, fps):
@@ -78,8 +86,10 @@ def get_ocr_frames(view, fps):
                 frame.update(target)
                 frames[i] = frame
     else:
-        frames = [OCRFrame(annotation, fps)
-                  for annotation in view.get_annotations()]
+        for annotation in view.get_annotations():
+            frame = OCRFrame(annotation, fps)
+            i = frame.frame_num or frame.range
+            frames[i] = frame
     return frames
 
 
@@ -108,9 +118,8 @@ def render_ocr(vid_path, page_number):
     page = frames_pages[str(page_number)]
     for frame_num, frame in page:
         # If index is range instead of frame...
-        # if type(frame_num) == str:
-        #     start, end = frame_num.split("-")
-        #     frame_num = (int(start) + int(end)) / 2
+        if frame.get("range"):
+            frame_num = (int(frame["range"][0]) + int(frame["range"][1])) / 2
         cv2_vid.set(1, frame_num)
         _, frame_cap = cv2_vid.read()
         with tempfile.NamedTemporaryFile(
@@ -160,9 +169,9 @@ def round_boxes(boxes):
 def get_ocr_views(mmif):
     """Return OCR views, which have TextDocument, BoundingBox, and Alignment annotations"""
     views = []
-    ocr_apps = ["east-textdetection", "tesseract"]
+    ocr_apps = ["east-textdetection", "tesseract", "chyron-text-recognition"]
     for view in mmif.views:
-        if any([view.metadata.app.find(ocr_app) for ocr_app in ocr_apps]):
+        if any([ocr_app in view.metadata.app for ocr_app in ocr_apps]):
             views.append(view)
     return views
 
