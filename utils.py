@@ -371,5 +371,5 @@ def prepare_ocr_visualization(mmif, view):
     find_duplicates(frames_list)
     frames_pages = paginate(frames_list)
     # Save page list as temp file
-    save_json(frames_pages)
-    return render_ocr(vid_path, 0)
+    save_json(frames_pages, view.id)
+    return render_ocr(vid_path, view.id, 0)

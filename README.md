@@ -66,13 +66,15 @@ With this, the mounted directory `/data` in the container is accessable from ins
 
 
 
-## Running the server without Docker/Podman
+## Running the server locally
 
 First install the python dependencies listed in `requirements.txt`:
 
 ````bash
 $ pip install -r requirements.txt
 ````
+
+You will also need to install opencv-python if you are not running within a container (`pip install opencv-python`).
 
 Let's again assume that the data are in a local directory `/Users/Shared/archive` with sub directories `audio`, `image`, `text` and`video`. You need to copy, symlink, or mount that local directory into the `static` directory. Note that the `static/data` symbolic link that is in the repository is set up to work with the docker containers, if you keep it in that form your data need to be in `/data`, otherwise you need to change the link to fit your needs, for example, you could remove the symbolic link and replace it with one that uses your local directory:
 

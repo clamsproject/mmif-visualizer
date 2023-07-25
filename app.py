@@ -21,7 +21,8 @@ def ocrpage():
     data = request.json
     try:
         page_number = data["page_number"]
-        return (render_ocr(data['vid_path'], page_number))
+        view_id = data["view_id"]
+        return (render_ocr(data['vid_path'], data["view_id"], page_number))
     except Exception as e:
         return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
         pass

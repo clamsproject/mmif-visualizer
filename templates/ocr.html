@@ -1,4 +1,4 @@
-<div id="ocr_tab">
+<div id="ocr_tab_{{view_id}}">
     {% for frame_num, frame in page %}
         {% set filename = frame["id"] %}
         {% set id = frame["id"] %}
@@ -37,7 +37,7 @@
         </div>
     {% endfor %}
     {% if n_pages > 1 %}
-        <div id="page-buttons">
+        <div class="page-buttons">
         </div>
     {% endif %}
 </div>
@@ -119,6 +119,7 @@ FORWARD = -2
 function changePage(page) {
         var data = {
             "vid_path": "{{vid_path}}",
+            "view_id": "{{view_id}}",
             "page_number": parseInt("{{page_number}}")
         }
         if (page == BACKWARD) {
@@ -137,7 +138,7 @@ function changePage(page) {
             contentType: "application/json",
             data: JSON.stringify(data),
             success: function(res_html){
-              $('#ocr_tab').parent().html(res_html);
+              $('#ocr_tab_{{view_id}}').parent().html(res_html);
             }
         })
         }
@@ -173,7 +174,7 @@ function changePage(page) {
             })
         })
 
-        $("#page-buttons").each(function() {
+        $("#ocr_tab_{{view_id}} .page-buttons").each(function() {
             page_number = parseInt("{{page_number}}")
             n_pages = parseInt("{{n_pages}}")
 
@@ -199,5 +200,5 @@ function changePage(page) {
 
             $(this).append(`<input id="page-input" onKeyPress="if(event.keyCode==13) enterPageNumber();" />`)
         })
-    })  
+    })
   </script>
