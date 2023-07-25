@@ -14,6 +14,7 @@ The application also includes tailored visualizations depending on the annotatio
 | [WebVTT](https://www.w3.org/TR/webvtt1/) for showing alignments of video captions. | [Whisper](https://github.com/clamsproject/app-whisper-wrapper), [Kaldi](https://github.com/clamsproject/app-aapb-pua-kaldi-wrapper) |
 | Javascript bounding boxes for image and OCR annotations. | [Tesseract](https://github.com/clamsproject/app-tesseractocr-wrapper), [EAST](https://github.com/clamsproject/app-east-textdetection) |
 | Named entity annotations with [displaCy.](https://explosion.ai/demos/displacy-ent) | [SPACY](https://github.com/clamsproject/app-spacy-wrapper) |                                                                        |
+| Screenshots & HTML5 video navigation of TimeFrames | [Chyron text recognition](https://github.com/clamsproject/app-chyron-text-recognition), [Slate detection](https://github.com/clamsproject/app-slatedetection), [Bars detection](https://github.com/clamsproject/app-barsdetection) |
 
 
 
