@@ -1,4 +1,6 @@
 import datetime
+import pathlib
+
 import cv2
 import tempfile
 import json
@@ -128,7 +130,7 @@ def render_ocr(vid_path, page_number):
         cv2_vid.set(1, frame_num)
         _, frame_cap = cv2_vid.read()
         with tempfile.NamedTemporaryFile(
-                prefix="/app/static/tmp/", suffix=".jpg", delete=False) as tf:
+                prefix=str(pathlib.Path(__file__).parent /'static'/'tmp'), suffix=".jpg", delete=False) as tf:
             cv2.imwrite(tf.name, frame_cap)
             # "id" is just the name of the temp image file
             frame["id"] = tf.name[12:]
@@ -182,8 +184,7 @@ def get_ocr_views(mmif):
 
 def save_json(dict):
     # jsonified_pages = json.dumps(dict)
-    with tempfile.NamedTemporaryFile(
-        prefix="/app/static/tmp/", suffix=".json", delete=False) as tf:
+    with tempfile.NamedTemporaryFile(prefix=str(pathlib.Path(__file__).parent /'static'/'tmp'), suffix=".json", delete=False) as tf:
         pages_json = open(tf.name, "w")
         json.dump(dict, pages_json)
         session["frames_pages"] = tf.name
