@@ -1,12 +1,9 @@
 import os
+import pathlib
 import sys
 import secrets
-import html
-import datetime
-import ast
-import json
 
-from flask import request, render_template, flash, redirect, send_from_directory, session
+from flask import request, render_template, flash, redirect, send_from_directory
 from werkzeug.utils import secure_filename
 from mmif.serialize import Mmif
 
@@ -70,7 +67,7 @@ def render_mmif(mmif_str):
 
 if __name__ == '__main__':
     # Make path for temp files
-    tmp_path = '/app/static/tmp'
+    tmp_path = pathlib.Path(__file__).parent /'static'/'tmp'
     if not os.path.exists(tmp_path):
         os.makedirs(tmp_path)
 

@@ -1,5 +1,6 @@
 import json
 import os
+import pathlib
 import tempfile
 from typing import Dict
 
@@ -106,7 +107,7 @@ def add_structure_from_timeframe(in_mmif: Mmif, iiif_json: Dict):
 
 def save_manifest(iiif_json: Dict) -> str:
     # generate a iiif manifest and save output file
-    manifest = tempfile.NamedTemporaryFile('w', dir="/app/static/tmp/", suffix='.json', delete=False)
+    manifest = tempfile.NamedTemporaryFile('w', dir=str(pathlib.Path(__file__).parent /'static'/'tmp'), suffix='.json', delete=False)
     json.dump(iiif_json, manifest, indent=4)
     return manifest.name
 
