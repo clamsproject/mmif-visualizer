@@ -159,7 +159,7 @@ def prep_annotations(mmif):
         if not ocr_view.annotations:
             continue
         visualization = prepare_ocr_visualization(mmif, ocr_view)
-        tabname = "OCR-%s" % ocr_view.id if use_id else "OCR"
+        tabname = "Frames-%s" % ocr_view.id
         tabs.append((tabname, visualization))
     return tabs
 

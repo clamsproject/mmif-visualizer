@@ -36,9 +36,10 @@
             </div>
         </div>
     {% endfor %}
-    <div id="page-buttons">
-    </div>
-
+    {% if n_pages > 1 %}
+        <div id="page-buttons">
+        </div>
+    {% endif %}
 </div>
 
 <style>

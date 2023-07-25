@@ -78,7 +78,7 @@ def get_ocr_frames(view, fps):
             source = view.get_annotation_by_id(alignment.properties["source"])
             target = view.get_annotation_by_id(alignment.properties["target"])
             frame = OCRFrame(source, fps)
-            i = frame.frame_num or frame.range
+            i = frame.frame_num if frame.frame_num is not None else frame.range
             if i in frames.keys():
                 frames[i].update(source)
                 frames[i].update(target)
@@ -88,8 +88,13 @@ def get_ocr_frames(view, fps):
     else:
         for annotation in view.get_annotations():
             frame = OCRFrame(annotation, fps)
-            i = frame.frame_num or frame.range
-            frames[i] = frame
+            i = frame.frame_num if frame.frame_num is not None else frame.range
+            if i is None:
+                continue
+            if i in frames.keys():
+                frames[i].update(annotation)
+            else:
+                frames[i] = frame
     return frames
 
 
