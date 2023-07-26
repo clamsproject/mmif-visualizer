@@ -67,18 +67,23 @@ class OCRFrame():
             self.timestamp_range = (str(datetime.timedelta(seconds=start_secs)), str(datetime.timedelta(seconds=end_secs)))
             self.sec_range = (start_secs, end_secs)
 
-        # self.range = f"{anno.properties.get('start')}-{anno.properties.get('end')}"
+
+def find_annotation(anno_id, view, mmif):
+    if mmif.id_delimiter in anno_id:
+        view_id, anno_id = anno_id.split(mmif.id_delimiter)
+        view = mmif.get_view_by_id(view_id)
+    return view.get_annotation_by_id(anno_id)
 
 
-def get_ocr_frames(view, fps):
+def get_ocr_frames(view, mmif, fps):
     frames = {}
     full_alignment_type = [
         at_type for at_type in view.metadata.contains if at_type.shortname == "Alignment"]
     # If view contains alignments
     if full_alignment_type:
         for alignment in view.get_annotations(full_alignment_type[0]):
-            source = view.get_annotation_by_id(alignment.properties["source"])
-            target = view.get_annotation_by_id(alignment.properties["target"])
+            source = find_annotation(alignment.properties["source"], view, mmif)
+            target = find_annotation(alignment.properties["target"], view, mmif)
             frame = OCRFrame(source, fps)
             i = frame.frame_num if frame.frame_num is not None else frame.range
             if i in frames.keys():
@@ -177,7 +182,7 @@ def round_boxes(boxes):
 def get_ocr_views(mmif):
     """Return OCR views, which have TextDocument, BoundingBox, and Alignment annotations"""
     views = []
-    ocr_apps = ["east-textdetection", "tesseract", "chyron-text-recognition", "slatedetection", "barsdetection"]
+    ocr_apps = ["east-textdetection", "tesseract", "chyron-text-recognition", "slatedetection", "barsdetection", "parseq-wrapper"]
     for view in mmif.views:
         if any([ocr_app in view.metadata.app for ocr_app in ocr_apps]):
             views.append(view)

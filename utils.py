@@ -364,7 +364,7 @@ def prepare_ocr_visualization(mmif, view):
     cv2_vid = cv2.VideoCapture(vid_path)
     fps = cv2_vid.get(cv2.CAP_PROP_FPS)
 
-    ocr_frames = get_ocr_frames(view, fps)
+    ocr_frames = get_ocr_frames(view, mmif, fps)
 
     # Generate pages (necessary to reduce IO cost) and render
     frames_list = [(k, vars(v)) for k, v in ocr_frames.items()]
