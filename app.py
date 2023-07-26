@@ -1,9 +1,7 @@
 import os
+import pathlib
 import sys
 import secrets
-import html
-import datetime
-import ast
 
 from flask import request, render_template, flash, redirect, send_from_directory
 from werkzeug.utils import secure_filename
@@ -17,12 +15,11 @@ def index():
 
 @app.route('/ocrpage', methods=['POST'])
 def ocrpage():
-    data = request.form
+    data = request.json
     try:
-        frames_pages = eval(html.unescape(data['frames_pages']))
-        page_number = int(data['page_number'])
-
-        return (render_ocr(data['vid_path'], frames_pages, page_number))
+        page_number = data["page_number"]
+        view_id = data["view_id"]
+        return (render_ocr(data['vid_path'], data["view_id"], page_number))
     except Exception as e:
         return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
         pass
@@ -68,15 +65,9 @@ def render_mmif(mmif_str):
                            mmif=mmif, media=media, annotations=annotations)
 
 
-# Not sure what this was for, it had a route /display, but that did not work
-# def display_file():
-#    mmif_str = requests.get(request.args["file"]).text
-#    return display_mmif(mmif_str)
-
-
 if __name__ == '__main__':
     # Make path for temp files
-    tmp_path = '/app/static/tmp'
+    tmp_path = pathlib.Path(__file__).parent /'static'/'tmp'
     if not os.path.exists(tmp_path):
         os.makedirs(tmp_path)
 

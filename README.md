@@ -14,6 +14,7 @@ The application also includes tailored visualizations depending on the annotatio
 | [WebVTT](https://www.w3.org/TR/webvtt1/) for showing alignments of video captions. | [Whisper](https://github.com/clamsproject/app-whisper-wrapper), [Kaldi](https://github.com/clamsproject/app-aapb-pua-kaldi-wrapper) |
 | Javascript bounding boxes for image and OCR annotations. | [Tesseract](https://github.com/clamsproject/app-tesseractocr-wrapper), [EAST](https://github.com/clamsproject/app-east-textdetection) |
 | Named entity annotations with [displaCy.](https://explosion.ai/demos/displacy-ent) | [SPACY](https://github.com/clamsproject/app-spacy-wrapper) |                                                                        |
+| Screenshots & HTML5 video navigation of TimeFrames | [Chyron text recognition](https://github.com/clamsproject/app-chyron-text-recognition), [Slate detection](https://github.com/clamsproject/app-slatedetection), [Bars detection](https://github.com/clamsproject/app-barsdetection) |
 
 
 
@@ -65,13 +66,15 @@ With this, the mounted directory `/data` in the container is accessable from ins
 
 
 
-## Running the server without Docker/Podman
+## Running the server locally
 
 First install the python dependencies listed in `requirements.txt`:
 
 ````bash
 $ pip install -r requirements.txt
 ````
+
+You will also need to install opencv-python if you are not running within a container (`pip install opencv-python`).
 
 Let's again assume that the data are in a local directory `/Users/Shared/archive` with sub directories `audio`, `image`, `text` and`video`. You need to copy, symlink, or mount that local directory into the `static` directory. Note that the `static/data` symbolic link that is in the repository is set up to work with the docker containers, if you keep it in that form your data need to be in `/data`, otherwise you need to change the link to fit your needs, for example, you could remove the symbolic link and replace it with one that uses your local directory:
 
