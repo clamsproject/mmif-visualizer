@@ -138,7 +138,7 @@ def render_ocr(vid_path, view_id, page_number):
                 prefix=str(pathlib.Path(__file__).parent /'static'/'tmp'), suffix=".jpg", delete=False) as tf:
             cv2.imwrite(tf.name, frame_cap)
             # "id" is just the name of the temp image file
-            frame["id"] = tf.name[12:]
+            frame["id"] = pathlib.Path(tf.name).name
 
     return render_template('ocr.html',
                            vid_path=vid_path,
