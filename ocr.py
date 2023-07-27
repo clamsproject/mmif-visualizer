@@ -8,15 +8,15 @@ import re
 import html
 
 from flask import render_template, session
+from mmif.utils.video_document_helper import convert_timepoint, convert_timeframe
 # from utils import app
 
 
 class OCRFrame():
     """Class representing an (aligned or otherwise) set of OCR annotations for a single frame"""
 
-    def __init__(self, anno, fps):
+    def __init__(self, anno, mmif):
         self.text = []
-        self.fps = fps
         self.boxes = []
         self.anno_ids = []
         self.timestamp = None
@@ -26,24 +26,26 @@ class OCRFrame():
         self.range = None
         self.timestamp_range = None
         self.sec_range = None
+        self.frametype = None
+        self.boxtypes = []
 
-        self.update(anno)
+        self.update(anno, mmif)
 
-    def update(self, anno):
+    def update(self, anno, mmif):
         if anno.at_type.shortname == "BoundingBox":
-            self.add_bounding_box(anno)
+            self.add_bounding_box(anno, mmif)
 
         elif anno.at_type.shortname == "TimeFrame":
-            self.add_timeframe(anno)
+            self.add_timeframe(anno, mmif)
 
         elif anno.at_type.shortname == "TextDocument":
             t = anno.properties.get("text_value") or anno.properties.get("text").value
             if t:
                 self.text.append(re.sub(r'([\\\/\|\"\'])', r'\1 ', t))
 
-    def add_bounding_box(self, anno):
-        self.frame_num = anno.properties.get(
-            "frame") or anno.properties.get("timePoint")
+    def add_bounding_box(self, anno, mmif):
+        self.frame_num = convert_timepoint(mmif, anno, "frames")
+        self.secs = convert_timepoint(mmif, anno, "seconds")
         box_id = anno.properties["id"]
         boxType = anno.properties["boxType"]
         coordinates = anno.properties["coordinates"]
@@ -54,18 +56,19 @@ class OCRFrame():
         box = [box_id, boxType, [x, y, w, h]]
         self.boxes.append(box)
         self.anno_ids.append(box_id)
-        if self.fps:
-            secs = int(self.frame_num/self.fps)
-            self.timestamp = str(datetime.timedelta(seconds=secs))
-            self.secs = secs
+        self.timestamp = str(datetime.timedelta(seconds=self.secs))
+        if anno.properties.get("boxType") and anno.properties.get("boxType") not in self.boxtypes:
+            self.boxtypes.append(anno.properties.get("boxType"))
 
-    def add_timeframe(self, anno):
-        start, end = anno.properties.get('start'), anno.properties.get('end')
+
+    def add_timeframe(self, anno, mmif):
+        start, end = convert_timeframe(mmif, anno, "frames")
+        start_secs, end_secs = convert_timeframe(mmif, anno, "seconds")
         self.range = (start, end)
-        if self.fps:
-            start_secs, end_secs = int(start/self.fps), int(end/self.fps)
-            self.timestamp_range = (str(datetime.timedelta(seconds=start_secs)), str(datetime.timedelta(seconds=end_secs)))
-            self.sec_range = (start_secs, end_secs)
+        self.timestamp_range = (str(datetime.timedelta(seconds=start_secs)), str(datetime.timedelta(seconds=end_secs)))
+        self.sec_range = (start_secs, end_secs)
+        if anno.properties.get("frameType"):
+            self.frametype = anno.properties.get("frameType")
 
 
 def find_annotation(anno_id, view, mmif):
@@ -84,22 +87,23 @@ def get_ocr_frames(view, mmif, fps):
         for alignment in view.get_annotations(full_alignment_type[0]):
             source = find_annotation(alignment.properties["source"], view, mmif)
             target = find_annotation(alignment.properties["target"], view, mmif)
-            frame = OCRFrame(source, fps)
+            
+            frame = OCRFrame(source, mmif)
             i = frame.frame_num if frame.frame_num is not None else frame.range
             if i in frames.keys():
-                frames[i].update(source)
-                frames[i].update(target)
+                frames[i].update(source, mmif)
+                frames[i].update(target, mmif)
             else:
-                frame.update(target)
+                frame.update(target, mmif)
                 frames[i] = frame
     else:
         for annotation in view.get_annotations():
-            frame = OCRFrame(annotation, fps)
+            frame = OCRFrame(annotation, mmif)
             i = frame.frame_num if frame.frame_num is not None else frame.range
             if i is None:
                 continue
             if i in frames.keys():
-                frames[i].update(annotation)
+                frames[i].update(annotation, mmif)
             else:
                 frames[i] = frame
     return frames
@@ -189,7 +193,6 @@ def get_ocr_views(mmif):
     return views
 
 def save_json(dict, view_id):
-    # jsonified_pages = json.dumps(dict)
     with tempfile.NamedTemporaryFile(prefix=str(pathlib.Path(__file__).parent /'static'/'tmp'), suffix=".json", delete=False) as tf:
         pages_json = open(tf.name, "w")
         json.dump(dict, pages_json)
