@@ -132,17 +132,26 @@ def render_ocr(vid_path, view_id, page_number):
     f = open(session[f"{view_id}-page-file"])
     frames_pages = json.load(f)
     page = frames_pages[str(page_number)]
+    prev_frame_cap = None
     for frame_num, frame in page:
         # If index is range instead of frame...
         if frame.get("range"):
             frame_num = (int(frame["range"][0]) + int(frame["range"][1])) / 2
         cv2_vid.set(1, frame_num)
         _, frame_cap = cv2_vid.read()
+        if frame_cap is None:
+            raise FileNotFoundError(f"Video file {vid_path} not found!")
+
+        # Double check histogram similarity of "repeat" frames -- if they're significantly different, un-mark as repeat
+        if prev_frame_cap is not None and frame["repeat"] and not is_duplicate_image(prev_frame_cap, frame_cap, cv2_vid):
+            frame["repeat"] = False
+
         with tempfile.NamedTemporaryFile(
                 prefix=str(pathlib.Path(__file__).parent /'static'/'tmp'), suffix=".jpg", delete=False) as tf:
             cv2.imwrite(tf.name, frame_cap)
             # "id" is just the name of the temp image file
             frame["id"] = pathlib.Path(tf.name).name
+        prev_frame_cap = frame_cap
 
     return render_template('ocr.html',
                            vid_path=vid_path,
@@ -152,24 +161,53 @@ def render_ocr(vid_path, view_id, page_number):
                            page_number=str(page_number))
 
 
-def find_duplicates(frames_list):
+def find_duplicates(frames_list, cv2_vid):
     """Find duplicate frames"""
     prev_frame = None
     for frame_num, frame in frames_list:
-        if is_duplicate_ocr_frame(frame, prev_frame):
+        # Frame is timeframe annotation
+        if type(frame_num) != int:
+            continue
+        if is_duplicate_ocr_frame(prev_frame, frame):
             frame["repeat"] = True
         prev_frame = frame
     return frames_list
 
 
-def is_duplicate_ocr_frame(frame, prev_frame):
-    if prev_frame:
-        # Check Boundingbox distances
-        rounded_prev = round_boxes(prev_frame["boxes"])
-        for box in round_boxes(frame["boxes"]):
-            if box in rounded_prev and frame["secs"]-prev_frame["secs"] < 5:
-                return True
+def is_duplicate_ocr_frame(prev_frame, frame):
+    if not prev_frame:
+        return False 
+    if prev_frame.get("boxtypes") != frame.get("boxtypes"):
+        return False
+    if abs(len(prev_frame.get("boxes"))-len(frame.get("boxes"))) > 3:
+        return False
+    # Check Boundingbox distances
+    rounded_prev = round_boxes(prev_frame.get("boxes"))
+    for box in round_boxes(frame.get("boxes")):
+        if box in rounded_prev and frame["secs"]-prev_frame["secs"] < 10:
+            return True
+    # Check overlap in text
+    prev_text, text = set(prev_frame.get("text")), set(frame.get("text"))
+    if prev_text and text and prev_text.intersection(text):
+        return True
     return False
+
+def is_duplicate_image(prev_frame, frame, cv2_vid):
+
+    # Convert it to HSV
+    img1_hsv = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2HSV)
+    img2_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # Calculate the histogram and normalize it
+    hist_img1 = cv2.calcHist([img1_hsv], [0,1], None, [180,256], [0,180,0,256])
+    cv2.normalize(hist_img1, hist_img1, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX);
+    hist_img2 = cv2.calcHist([img2_hsv], [0,1], None, [180,256], [0,180,0,256])
+    cv2.normalize(hist_img2, hist_img2, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX);
+
+    # Find the metric value
+    metric_val = cv2.compareHist(hist_img1, hist_img2, cv2.HISTCMP_CHISQR)
+    return metric_val < 50
+
 
 
 def round_boxes(boxes):
@@ -178,7 +216,7 @@ def round_boxes(boxes):
     for box in boxes:
         rounded_box = []
         for coord in box[2]:
-            rounded_box.append(round(coord/10)*10)
+            rounded_box.append(round(coord/100)*100)
         rounded_boxes.append(rounded_box)
     return rounded_boxes
 
@@ -186,9 +224,11 @@ def round_boxes(boxes):
 def get_ocr_views(mmif):
     """Return OCR views, which have TextDocument, BoundingBox, and Alignment annotations"""
     views = []
-    ocr_apps = ["east-textdetection", "tesseract", "chyron-text-recognition", "slatedetection", "barsdetection", "parseq-wrapper"]
+    required_types = ["TimeFrame", "BoundingBox", "TextDocument"]
+    ocr_apps = ["east", "tesseract", "chyron", "slate", "bars", "parseq"]
     for view in mmif.views:
-        if any([ocr_app in view.metadata.app for ocr_app in ocr_apps]):
+        if (any([ocr_app in view.metadata.app for ocr_app in ocr_apps]) and 
+                any([anno_type.shortname in required_types for anno_type in view.metadata.contains.keys()])):
             views.append(view)
     return views
 

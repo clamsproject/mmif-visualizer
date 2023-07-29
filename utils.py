@@ -1,17 +1,13 @@
 import os
 import cv2
-from io import StringIO
+from io import StringIO, BytesIO
 # from string import Template
 from collections import Counter
 
 import displacy
 import tempfile
-import re
-import json
-import html
 
 from flask import Flask, render_template
-from flask_session import Session
 from werkzeug.utils import secure_filename
 
 from mmif.serialize import Mmif, View
@@ -158,8 +154,9 @@ def prep_annotations(mmif):
     for ocr_view in ocr_views:
         if not ocr_view.annotations:
             continue
-        visualization = prepare_ocr_visualization(mmif, ocr_view)
+        # visualization = "prepare_ocr_visualization(mmif, ocr_view)"
         tabname = "Frames-%s" % ocr_view.id
+        visualization = render_template("pre-ocr.html", view_id=ocr_view.id, tabname=tabname)
         tabs.append((tabname, visualization))
     return tabs
 
@@ -368,7 +365,7 @@ def prepare_ocr_visualization(mmif, view):
 
     # Generate pages (necessary to reduce IO cost) and render
     frames_list = [(k, vars(v)) for k, v in ocr_frames.items()]
-    find_duplicates(frames_list)
+    frames_list = find_duplicates(frames_list, cv2_vid)
     frames_pages = paginate(frames_list)
     # Save page list as temp file
     save_json(frames_pages, view.id)
