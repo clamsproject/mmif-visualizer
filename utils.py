@@ -7,7 +7,7 @@ from collections import Counter
 import displacy
 import tempfile
 
-from flask import Flask, render_template
+from flask import Flask, render_template, session
 from werkzeug.utils import secure_filename
 
 from mmif.serialize import Mmif, View
@@ -26,7 +26,7 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = 'your_secret_key_here'
 
 def get_alignments(alignment_view):
-    vtt_file = tempfile.NamedTemporaryFile('w', dir="static/", suffix='.vtt', delete=False)
+    vtt_file = tempfile.NamedTemporaryFile('w', dir=f"/app/static/{session['mmif_id']}", suffix='.vtt', delete=False)
     vtt_file.write("WEBVTT\n\n")
     annotations = alignment_view.annotations
     timeframe_at_type = [at_type for at_type in alignment_view.metadata.contains if at_type.shortname == "TimeFrame" ][0]
@@ -94,7 +94,7 @@ def get_media(mmif):
         media.append((doc_type, document.id, doc_path, html))
     manifest_filename = generate_iiif_manifest(mmif)
     man = os.path.basename(manifest_filename)
-    temp = render_template("uv_player.html", manifest=man)
+    temp = render_template("uv_player.html", manifest=man, mmif_id=session["mmif_id"])
     media.append(('UV', "", "", temp))
     return media
 
@@ -154,9 +154,8 @@ def prep_annotations(mmif):
     for ocr_view in ocr_views:
         if not ocr_view.annotations:
             continue
-        # visualization = "prepare_ocr_visualization(mmif, ocr_view)"
         tabname = "Frames-%s" % ocr_view.id
-        visualization = render_template("pre-ocr.html", view_id=ocr_view.id, tabname=tabname)
+        visualization = render_template("pre-ocr.html", view_id=ocr_view.id, tabname=tabname, mmif_id=session["mmif_id"])
         tabs.append((tabname, visualization))
     return tabs
 
@@ -245,9 +244,11 @@ def html_video(vpath, vtt_srcview=None):
     html.write(f'    <source src=\"{vpath}\">\n')
     if vtt_srcview is not None:
         vtt_path = view_to_vtt(vtt_srcview)
+        src = "/" + os.sep.join(vtt_path.split(os.sep)[-2:])
         # use only basename because "static" directory is mapped to '' route by
         # `static_url_path` param
-        src = os.path.basename(vtt_path)
+        # src = os.path.basename(vtt_path)
+
         html.write(f'    <track kind="subtitles" srclang="en" src="{src}" label="English" default>\n')
     html.write("</video>\n")
     return html.getvalue()
@@ -326,7 +327,8 @@ def get_ner_views(mmif):
 def view_to_vtt(alignment_view):
     """Write alignments to a file in VTT style and return the filename."""
     vtt_file = get_alignments(alignment_view)
-    return os.sep.join(vtt_file.name.split(os.sep)[-2:])
+    return vtt_file.name
+    # return os.sep.join(vtt_file.name.split(os.sep)[-3:])
 
 def create_ner_visualization(mmif, view):
     metadata = view.metadata.contains.get(Uri.NE)
@@ -354,7 +356,7 @@ def get_properties(annotation):
 
 # OCR Tools ----------------------
 
-def prepare_ocr_visualization(mmif, view):
+def prepare_ocr_visualization(mmif, view, mmif_id):
     """ Visualize OCR by extracting image frames with BoundingBoxes from video"""
     # frames, text_docs, alignments = {}, {}, {}
     vid_path = get_video_path(mmif)
@@ -368,5 +370,5 @@ def prepare_ocr_visualization(mmif, view):
     frames_list = find_duplicates(frames_list, cv2_vid)
     frames_pages = paginate(frames_list)
     # Save page list as temp file
-    save_json(frames_pages, view.id)
-    return render_ocr(vid_path, view.id, 0)
+    save_json(frames_pages, view.id, mmif_id)
+    return render_ocr(mmif_id, vid_path, view.id, 0)

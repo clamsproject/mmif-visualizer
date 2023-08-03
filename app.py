@@ -4,8 +4,9 @@ import sys
 import secrets
 import json
 import html
+import uuid
 
-from flask import request, render_template, flash, redirect, send_from_directory, session
+from flask import request, render_template, flash, redirect, send_from_directory, session, redirect
 from werkzeug.utils import secure_filename
 from mmif.serialize import Mmif
 
@@ -20,10 +21,10 @@ def index():
 def ocr():
     try:
         data = dict(request.json)
-        mmif_str = open(session["mmif_file"]).read()
+        mmif_str = open(os.path.join("/app", "static", data["mmif_id"], "file.mmif")).read()
         mmif = Mmif(mmif_str)
         ocr_view = mmif.get_view_by_id(data["view_id"])
-        return prepare_ocr_visualization(mmif, ocr_view)
+        return prepare_ocr_visualization(mmif, ocr_view, data["mmif_id"])
     except Exception as e:
         return f'<p class="error">{e}</h1>'
 
@@ -32,7 +33,7 @@ def ocr():
 def ocrpage():
     data = request.json
     try:
-        return (render_ocr(data['vid_path'], data["view_id"], data["page_number"]))
+        return (render_ocr(data["mmif_id"], data['vid_path'], data["view_id"], data["page_number"]))
     except Exception as e:
         return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
 
@@ -56,14 +57,30 @@ def upload():
             flash('WARNING: no file was selected')
             return redirect(request.url)
         if file:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join('temp', filename))
-            with open("temp/" + filename) as fh:
-                session["mmif_file"] = fh.name
+            # filename = secure_filename(file.filename)
+            id = str(uuid.uuid4())
+            session["mmif_id"] = id
+            path = os.path.join("/app", "static", id)
+            os.makedirs(path)
+
+            file.save(os.path.join(path, "file.mmif"))
+            with open(os.path.join(path, "file.mmif")) as fh:
                 mmif_str = fh.read()
-                return render_mmif(mmif_str)
+            html_page = render_mmif(mmif_str)
+            file.save(os.path.join(path, "index.html"))
+            with open(os.path.join(path, "index.html"), "w") as f:
+                f.write(html_page)
+            return redirect(f"/display/{id}", code=302)
+        
     return render_template('upload.html')
 
+@app.route('/display/<id>')
+def display(id):
+    print ("THE ID IS " + id)
+    path = os.path.join("/app", "static", id)
+    with open(os.path.join(path, "index.html")) as f:
+        html_file = f.read()
+    return html_file
 
 @app.route('/uv/<path:path>')
 def send_js(path):
@@ -75,7 +92,7 @@ def render_mmif(mmif_str):
     media = get_media(mmif)
     annotations = prep_annotations(mmif)
     return render_template('player.html',
-                           mmif=mmif, media=media, annotations=annotations)
+                           media=media, annotations=annotations)
 
 
 if __name__ == '__main__':

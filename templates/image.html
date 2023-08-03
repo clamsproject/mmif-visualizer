@@ -3,6 +3,8 @@
 
 <script>
 
+    console.log("{{filename}} is filename")
+
     drawImage();
 
     function drawImage() {
@@ -15,6 +17,7 @@
         imageObj.src = '{{filename}}';
 
         imageObj.onload = function() {
+            console.log("...loaded?");
             
             var imgWidth = imageObj.naturalWidth;
             var imgHeight = imageObj.naturalHeight;
