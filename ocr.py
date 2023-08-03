@@ -9,7 +9,6 @@ import html
 
 from flask import render_template, session
 from mmif.utils.video_document_helper import convert_timepoint, convert_timeframe
-# from utils import app
 
 
 class OCRFrame():
@@ -222,14 +221,19 @@ def round_boxes(boxes):
 
 
 def get_ocr_views(mmif):
-    """Return OCR views, which have TextDocument, BoundingBox, and Alignment annotations"""
+    """Returns all CV views, which contain timeframes or bounding boxes"""
     views = []
-    required_types = ["TimeFrame", "BoundingBox", "TextDocument"]
-    ocr_apps = ["east", "tesseract", "chyron", "slate", "bars", "parseq"]
+    required_types = ["TimeFrame", "BoundingBox"]
     for view in mmif.views:
-        if (any([ocr_app in view.metadata.app for ocr_app in ocr_apps]) and 
-                any([anno_type.shortname in required_types for anno_type in view.metadata.contains.keys()])):
-            views.append(view)
+        for anno_type, anno in view.metadata.contains.items():
+            # Annotation belongs to a CV view if it is a TimeFrame/BB and it refers to a VideoDocument
+            if anno_type.shortname in required_types and mmif.get_document_by_id(anno["document"]).at_type.shortname == "VideoDocument":
+                views.append(view)
+                continue
+            # TODO: Couldn't find a simple way to show if an alignment view is a CV/Frames-type view
+            elif "parseq" in view.metadata.app:
+                views.append(view)
+                continue
     return views
 
 def save_json(dict, view_id):
