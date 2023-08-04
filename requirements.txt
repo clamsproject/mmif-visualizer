@@ -2,4 +2,5 @@ spacy==2.3.2
 mmif-python==1.0.8
 mmif-python[utils]==1.0.8
 flask-session
+flask[async]
 opencv-python==4.*

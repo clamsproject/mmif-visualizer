@@ -26,7 +26,7 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = 'your_secret_key_here'
 
 def get_alignments(alignment_view):
-    vtt_file = tempfile.NamedTemporaryFile('w', dir=f"/app/static/{session['mmif_id']}", suffix='.vtt', delete=False)
+    vtt_file = tempfile.NamedTemporaryFile('w', dir=f"/app/static/tmp/{session['mmif_id']}", suffix='.vtt', delete=False)
     vtt_file.write("WEBVTT\n\n")
     annotations = alignment_view.annotations
     timeframe_at_type = [at_type for at_type in alignment_view.metadata.contains if at_type.shortname == "TimeFrame" ][0]
@@ -275,7 +275,6 @@ def html_text(tpath):
 def html_img(ipath, boxes=None, id="imgCanvas"):
     ipath = url2posix(ipath)
     boxes = [] if boxes is None else boxes
-    # t = Template(open('templates/image.html').read())
     return render_template('image.html', filename=ipath, boxes=boxes, id=id)
 
 
