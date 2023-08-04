@@ -4,14 +4,13 @@ import sys
 import secrets
 import uuid
 import threading
-import shutil
-import time
 
 from flask import request, render_template, flash, redirect, send_from_directory, session, redirect
 from werkzeug.utils import secure_filename
 from mmif.serialize import Mmif
 
 from utils import app, render_ocr, get_media, prep_annotations, prepare_ocr_visualization
+from cache import set_last_access, scan_tmp_directory, cleanup
 
 global cleanup_thread
 cleanup_thread = None
@@ -79,19 +78,19 @@ def upload():
 
 @app.route('/display/<id>')
 def display(id):
-    path = os.path.join("/app/static/tmp", id)
-    set_last_access(path)
-    with open(os.path.join(path, "index.html")) as f:
-        html_file = f.read()
-    return html_file
+    try:
+        path = os.path.join("/app/static/tmp", id)
+        set_last_access(path)
+        with open(os.path.join(path, "index.html")) as f:
+            html_file = f.read()
+        return html_file
+    except FileNotFoundError:
+        flash("File not found -- please upload again (it may have been deleted to clear up cache space).")
+        return redirect("/upload")
 
 @app.route('/uv/<path:path>')
 def send_js(path):
     return send_from_directory("uv", path)
-
-def set_last_access(path):
-    with open(os.path.join(path, "last_access.txt"), "w") as f:
-        f.write(str(time.time()))
 
 def render_mmif(mmif_str):
     mmif = Mmif(mmif_str)
@@ -99,50 +98,6 @@ def render_mmif(mmif_str):
     annotations = prep_annotations(mmif)
     return render_template('player.html',
                            media=media, annotations=annotations)
-
-def scan_tmp_directory():
-    total_size = 0
-    oldest_accessed_dir = {"dir": None, "access_time": None}
-    for path, dirs, files in os.walk("/app/static/tmp"):
-        for f in files:
-            fp = os.path.join(path, f)
-            total_size += os.path.getsize(fp)
-
-        # Get oldest accessed directory for deletion
-        if os.path.dirname(path) != "/app/static/tmp":
-            continue
-        if not os.path.isfile(os.path.join(path, "last_access.txt")):
-            oldest_accessed_dir = {"dir": path, "access_time": 0}
-        elif oldest_accessed_dir["dir"] is None:
-            with open(os.path.join(path, "last_access.txt")) as f:
-                timestamp = f.read()
-                if timestamp == '':
-                    continue
-                oldest_accessed_dir = {"dir": path, "access_time": float(timestamp)}
-        else:
-            with open(os.path.join(path, "last_access.txt")) as f:
-                if float(f.read()) < oldest_accessed_dir["access_time"]:
-                    timestamp = f.read()
-                    if timestamp == '':
-                        continue
-                    oldest_accessed_dir = {"dir": path, "access_time": float(timestamp)}
-    
-    return total_size, oldest_accessed_dir["dir"]
-
-
-def cleanup():
-    print("Checking visualization cache...")
-    # Max tmp size is 50MB
-    max_size = 10000000
-    folder_size, oldest_dir = scan_tmp_directory()
-    while folder_size > max_size:
-        print(f"Maximum cache size reached. Deleting {os.path.basename(oldest_dir)}.")
-        shutil.rmtree(oldest_dir)
-        folder_size, oldest_dir = scan_tmp_directory()
-    # Cleanup again in 12 hours
-    time.sleep(43200)
-    cleanup()
-
 
 if __name__ == '__main__':
     # Make path for temp files
