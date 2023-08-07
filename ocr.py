@@ -8,15 +8,14 @@ import re
 import html
 
 from flask import render_template, session
-# from utils import app
+from mmif.utils.video_document_helper import convert_timepoint, convert_timeframe
 
 
 class OCRFrame():
     """Class representing an (aligned or otherwise) set of OCR annotations for a single frame"""
 
-    def __init__(self, anno, fps):
+    def __init__(self, anno, mmif):
         self.text = []
-        self.fps = fps
         self.boxes = []
         self.anno_ids = []
         self.timestamp = None
@@ -26,24 +25,26 @@ class OCRFrame():
         self.range = None
         self.timestamp_range = None
         self.sec_range = None
+        self.frametype = None
+        self.boxtypes = []
 
-        self.update(anno)
+        self.update(anno, mmif)
 
-    def update(self, anno):
+    def update(self, anno, mmif):
         if anno.at_type.shortname == "BoundingBox":
-            self.add_bounding_box(anno)
+            self.add_bounding_box(anno, mmif)
 
         elif anno.at_type.shortname == "TimeFrame":
-            self.add_timeframe(anno)
+            self.add_timeframe(anno, mmif)
 
         elif anno.at_type.shortname == "TextDocument":
             t = anno.properties.get("text_value") or anno.properties.get("text").value
             if t:
                 self.text.append(re.sub(r'([\\\/\|\"\'])', r'\1 ', t))
 
-    def add_bounding_box(self, anno):
-        self.frame_num = anno.properties.get(
-            "frame") or anno.properties.get("timePoint")
+    def add_bounding_box(self, anno, mmif):
+        self.frame_num = convert_timepoint(mmif, anno, "frames")
+        self.secs = convert_timepoint(mmif, anno, "seconds")
         box_id = anno.properties["id"]
         boxType = anno.properties["boxType"]
         coordinates = anno.properties["coordinates"]
@@ -54,18 +55,19 @@ class OCRFrame():
         box = [box_id, boxType, [x, y, w, h]]
         self.boxes.append(box)
         self.anno_ids.append(box_id)
-        if self.fps:
-            secs = int(self.frame_num/self.fps)
-            self.timestamp = str(datetime.timedelta(seconds=secs))
-            self.secs = secs
+        self.timestamp = str(datetime.timedelta(seconds=self.secs))
+        if anno.properties.get("boxType") and anno.properties.get("boxType") not in self.boxtypes:
+            self.boxtypes.append(anno.properties.get("boxType"))
 
-    def add_timeframe(self, anno):
-        start, end = anno.properties.get('start'), anno.properties.get('end')
+
+    def add_timeframe(self, anno, mmif):
+        start, end = convert_timeframe(mmif, anno, "frames")
+        start_secs, end_secs = convert_timeframe(mmif, anno, "seconds")
         self.range = (start, end)
-        if self.fps:
-            start_secs, end_secs = int(start/self.fps), int(end/self.fps)
-            self.timestamp_range = (str(datetime.timedelta(seconds=start_secs)), str(datetime.timedelta(seconds=end_secs)))
-            self.sec_range = (start_secs, end_secs)
+        self.timestamp_range = (str(datetime.timedelta(seconds=start_secs)), str(datetime.timedelta(seconds=end_secs)))
+        self.sec_range = (start_secs, end_secs)
+        if anno.properties.get("frameType"):
+            self.frametype = anno.properties.get("frameType")
 
 
 def find_annotation(anno_id, view, mmif):
@@ -84,22 +86,23 @@ def get_ocr_frames(view, mmif, fps):
         for alignment in view.get_annotations(full_alignment_type[0]):
             source = find_annotation(alignment.properties["source"], view, mmif)
             target = find_annotation(alignment.properties["target"], view, mmif)
-            frame = OCRFrame(source, fps)
+            
+            frame = OCRFrame(source, mmif)
             i = frame.frame_num if frame.frame_num is not None else frame.range
             if i in frames.keys():
-                frames[i].update(source)
-                frames[i].update(target)
+                frames[i].update(source, mmif)
+                frames[i].update(target, mmif)
             else:
-                frame.update(target)
+                frame.update(target, mmif)
                 frames[i] = frame
     else:
         for annotation in view.get_annotations():
-            frame = OCRFrame(annotation, fps)
+            frame = OCRFrame(annotation, mmif)
             i = frame.frame_num if frame.frame_num is not None else frame.range
             if i is None:
                 continue
             if i in frames.keys():
-                frames[i].update(annotation)
+                frames[i].update(annotation, mmif)
             else:
                 frames[i] = frame
     return frames
@@ -128,17 +131,26 @@ def render_ocr(vid_path, view_id, page_number):
     f = open(session[f"{view_id}-page-file"])
     frames_pages = json.load(f)
     page = frames_pages[str(page_number)]
+    prev_frame_cap = None
     for frame_num, frame in page:
         # If index is range instead of frame...
         if frame.get("range"):
             frame_num = (int(frame["range"][0]) + int(frame["range"][1])) / 2
         cv2_vid.set(1, frame_num)
         _, frame_cap = cv2_vid.read()
+        if frame_cap is None:
+            raise FileNotFoundError(f"Video file {vid_path} not found!")
+
+        # Double check histogram similarity of "repeat" frames -- if they're significantly different, un-mark as repeat
+        if prev_frame_cap is not None and frame["repeat"] and not is_duplicate_image(prev_frame_cap, frame_cap, cv2_vid):
+            frame["repeat"] = False
+
         with tempfile.NamedTemporaryFile(
                 prefix=str(pathlib.Path(__file__).parent /'static'/'tmp'), suffix=".jpg", delete=False) as tf:
             cv2.imwrite(tf.name, frame_cap)
             # "id" is just the name of the temp image file
             frame["id"] = pathlib.Path(tf.name).name
+        prev_frame_cap = frame_cap
 
     return render_template('ocr.html',
                            vid_path=vid_path,
@@ -148,24 +160,53 @@ def render_ocr(vid_path, view_id, page_number):
                            page_number=str(page_number))
 
 
-def find_duplicates(frames_list):
+def find_duplicates(frames_list, cv2_vid):
     """Find duplicate frames"""
     prev_frame = None
     for frame_num, frame in frames_list:
-        if is_duplicate_ocr_frame(frame, prev_frame):
+        # Frame is timeframe annotation
+        if type(frame_num) != int:
+            continue
+        if is_duplicate_ocr_frame(prev_frame, frame):
             frame["repeat"] = True
         prev_frame = frame
     return frames_list
 
 
-def is_duplicate_ocr_frame(frame, prev_frame):
-    if prev_frame:
-        # Check Boundingbox distances
-        rounded_prev = round_boxes(prev_frame["boxes"])
-        for box in round_boxes(frame["boxes"]):
-            if box in rounded_prev and frame["secs"]-prev_frame["secs"] < 5:
-                return True
+def is_duplicate_ocr_frame(prev_frame, frame):
+    if not prev_frame:
+        return False 
+    if prev_frame.get("boxtypes") != frame.get("boxtypes"):
+        return False
+    if abs(len(prev_frame.get("boxes"))-len(frame.get("boxes"))) > 3:
+        return False
+    # Check Boundingbox distances
+    rounded_prev = round_boxes(prev_frame.get("boxes"))
+    for box in round_boxes(frame.get("boxes")):
+        if box in rounded_prev and frame["secs"]-prev_frame["secs"] < 10:
+            return True
+    # Check overlap in text
+    prev_text, text = set(prev_frame.get("text")), set(frame.get("text"))
+    if prev_text and text and prev_text.intersection(text):
+        return True
     return False
+
+def is_duplicate_image(prev_frame, frame, cv2_vid):
+
+    # Convert it to HSV
+    img1_hsv = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2HSV)
+    img2_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # Calculate the histogram and normalize it
+    hist_img1 = cv2.calcHist([img1_hsv], [0,1], None, [180,256], [0,180,0,256])
+    cv2.normalize(hist_img1, hist_img1, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX);
+    hist_img2 = cv2.calcHist([img2_hsv], [0,1], None, [180,256], [0,180,0,256])
+    cv2.normalize(hist_img2, hist_img2, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX);
+
+    # Find the metric value
+    metric_val = cv2.compareHist(hist_img1, hist_img2, cv2.HISTCMP_CHISQR)
+    return metric_val < 50
+
 
 
 def round_boxes(boxes):
@@ -174,22 +215,28 @@ def round_boxes(boxes):
     for box in boxes:
         rounded_box = []
         for coord in box[2]:
-            rounded_box.append(round(coord/10)*10)
+            rounded_box.append(round(coord/100)*100)
         rounded_boxes.append(rounded_box)
     return rounded_boxes
 
 
 def get_ocr_views(mmif):
-    """Return OCR views, which have TextDocument, BoundingBox, and Alignment annotations"""
+    """Returns all CV views, which contain timeframes or bounding boxes"""
     views = []
-    ocr_apps = ["east-textdetection", "tesseract", "chyron-text-recognition", "slatedetection", "barsdetection", "parseq-wrapper"]
+    required_types = ["TimeFrame", "BoundingBox"]
     for view in mmif.views:
-        if any([ocr_app in view.metadata.app for ocr_app in ocr_apps]):
-            views.append(view)
+        for anno_type, anno in view.metadata.contains.items():
+            # Annotation belongs to a CV view if it is a TimeFrame/BB and it refers to a VideoDocument
+            if anno_type.shortname in required_types and mmif.get_document_by_id(anno["document"]).at_type.shortname == "VideoDocument":
+                views.append(view)
+                continue
+            # TODO: Couldn't find a simple way to show if an alignment view is a CV/Frames-type view
+            elif "parseq" in view.metadata.app:
+                views.append(view)
+                continue
     return views
 
 def save_json(dict, view_id):
-    # jsonified_pages = json.dumps(dict)
     with tempfile.NamedTemporaryFile(prefix=str(pathlib.Path(__file__).parent /'static'/'tmp'), suffix=".json", delete=False) as tf:
         pages_json = open(tf.name, "w")
         json.dump(dict, pages_json)
