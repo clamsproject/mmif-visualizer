@@ -2,7 +2,7 @@ import os
 import pathlib
 import sys
 import secrets
-import uuid
+import shortuuid
 from threading import Thread
 
 from flask import request, render_template, flash, redirect, send_from_directory, session, redirect
@@ -10,10 +10,7 @@ from werkzeug.utils import secure_filename
 from mmif.serialize import Mmif
 
 from utils import app, render_ocr, get_media, prep_annotations, prepare_ocr_visualization
-from cache import set_last_access, scan_tmp_directory, cleanup
-
-global cleanup_thread
-cleanup_thread = None
+from cache import set_last_access, cleanup
 
 @app.route('/')
 def index():
@@ -48,7 +45,7 @@ def upload():
     if request.method == 'POST':
         # Check if request is coming from elasticsearch
         if 'data' in request.form:
-            return render_mmif(request.form['data'])
+            return upload_file(request.form['data'])
         # Otherwise, check if the post request has the file part
         elif 'file' not in request.files:
             flash('WARNING: post request has no file part')
@@ -60,25 +57,7 @@ def upload():
             flash('WARNING: no file was selected')
             return redirect(request.url)
         if file:
-            # Save file locally
-            id = str(uuid.uuid4())
-            session["mmif_id"] = id
-            path = os.path.join("/app/static/tmp", id)
-            os.makedirs(path)
-            set_last_access(path)
-            file.save(os.path.join(path, "file.mmif"))
-            with open(os.path.join(path, "file.mmif")) as fh:
-                mmif_str = fh.read()
-            html_page = render_mmif(mmif_str)
-            with open(os.path.join(path, "index.html"), "w") as f:
-                f.write(html_page)
-
-            # Perform cleanup
-            t = Thread(target=cleanup)
-            t.daemon = True
-            t.run()
-
-            return redirect(f"/display/{id}", code=302)
+            return upload_file(file)
         
     return render_template('upload.html')
 
@@ -105,6 +84,31 @@ def render_mmif(mmif_str):
     return render_template('player.html',
                            media=media, annotations=annotations)
 
+def upload_file(file):
+    # Save file locally
+    id = shortuuid.uuid()
+    session["mmif_id"] = id
+    path = os.path.join("/app/static/tmp", id)
+    os.makedirs(path)
+    set_last_access(path)
+    file.save(os.path.join(path, "file.mmif"))
+    with open(os.path.join(path, "file.mmif")) as fh:
+        mmif_str = fh.read()
+    html_page = render_mmif(mmif_str)
+    with open(os.path.join(path, "index.html"), "w") as f:
+        f.write(html_page)
+
+    # Perform cleanup
+    t = Thread(target=cleanup)
+    t.daemon = True
+    t.run()
+
+    agent = request.headers.get('User-Agent')
+    if 'curl' in agent.lower():
+        return f"Document ID is {id}\nYou can access the visualized file at /display/{id}\n"
+    return redirect(f"/display/{id}", code=302)
+
+
 if __name__ == '__main__':
     # Make path for temp files
     tmp_path = pathlib.Path(__file__).parent /'static'/'tmp'
@@ -119,10 +123,5 @@ if __name__ == '__main__':
     port = 5000
     if len(sys.argv) > 2 and sys.argv[1] == '-p':
         port = int(sys.argv[2])
-
-    # if cleanup_thread is None:
-    #     cleanup_thread = threading.Timer(5, cleanup)
-    #     cleanup_thread.daemon = True
-    #     cleanup_thread.start()
         
     app.run(port=port, host='0.0.0.0', debug=True, use_reloader=False)

@@ -4,3 +4,4 @@ mmif-python[utils]==1.0.8
 flask-session
 flask[async]
 opencv-python==4.*
+shortuuid==1.0.11
