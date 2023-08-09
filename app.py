@@ -3,7 +3,7 @@ import pathlib
 import sys
 import secrets
 import uuid
-import threading
+from threading import Thread
 
 from flask import request, render_template, flash, redirect, send_from_directory, session, redirect
 from werkzeug.utils import secure_filename
@@ -60,11 +60,11 @@ def upload():
             flash('WARNING: no file was selected')
             return redirect(request.url)
         if file:
+            # Save file locally
             id = str(uuid.uuid4())
             session["mmif_id"] = id
             path = os.path.join("/app/static/tmp", id)
             os.makedirs(path)
-
             set_last_access(path)
             file.save(os.path.join(path, "file.mmif"))
             with open(os.path.join(path, "file.mmif")) as fh:
@@ -72,6 +72,12 @@ def upload():
             html_page = render_mmif(mmif_str)
             with open(os.path.join(path, "index.html"), "w") as f:
                 f.write(html_page)
+
+            # Perform cleanup
+            t = Thread(target=cleanup)
+            t.daemon = True
+            t.run()
+
             return redirect(f"/display/{id}", code=302)
         
     return render_template('upload.html')
@@ -114,9 +120,9 @@ if __name__ == '__main__':
     if len(sys.argv) > 2 and sys.argv[1] == '-p':
         port = int(sys.argv[2])
 
-    if cleanup_thread is None:
-        cleanup_thread = threading.Timer(5, cleanup)
-        cleanup_thread.daemon = True
-        cleanup_thread.start()
+    # if cleanup_thread is None:
+    #     cleanup_thread = threading.Timer(5, cleanup)
+    #     cleanup_thread.daemon = True
+    #     cleanup_thread.start()
         
     app.run(port=port, host='0.0.0.0', debug=True, use_reloader=False)

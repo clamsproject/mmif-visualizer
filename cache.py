@@ -1,6 +1,9 @@
 import os
 import time
 import shutil
+import threading
+
+lock = threading.Lock()
 
 def set_last_access(path):
     with open(os.path.join(path, "last_access.txt"), "w") as f:
@@ -37,14 +40,12 @@ def scan_tmp_directory():
 
 
 def cleanup():
-    print("Checking visualization cache...")
-    # Max tmp size is 50MB
-    max_size = 10000000
-    folder_size, oldest_dir = scan_tmp_directory()
-    while folder_size > max_size:
-        print(f"Maximum cache size reached. Deleting {os.path.basename(oldest_dir)}.")
-        shutil.rmtree(oldest_dir)
+    with lock:
+        print("Checking visualization cache...")
+        # Max tmp size is 50MB
+        max_size = 50000000
         folder_size, oldest_dir = scan_tmp_directory()
-    # Cleanup again in 12 hours
-    time.sleep(43200)
-    cleanup()
+        while folder_size > max_size:
+            print(f"Maximum cache size reached. Deleting {os.path.basename(oldest_dir)}.")
+            shutil.rmtree(oldest_dir)
+            folder_size, oldest_dir = scan_tmp_directory()
