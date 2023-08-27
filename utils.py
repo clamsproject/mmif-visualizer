@@ -18,6 +18,7 @@ from mmif.vocabulary import AnnotationTypes
 from lapps.discriminators import Uri
 from iiif_utils import generate_iiif_manifest
 from ocr import *
+from datetime import timedelta
 
 
 # Get Properties from MMIF file ---
@@ -27,13 +28,15 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 
 def get_alignments(alignment_view):
     vtt_file = tempfile.NamedTemporaryFile('w', dir="static/", suffix='.vtt', delete=False)
-    vtt_file.write("WebVTT\n\n")
+    vtt_file.write("WEBVTT\n\n")
     annotations = alignment_view.annotations
+    timeframe_at_type = [at_type for at_type in alignment_view.metadata.contains if at_type.shortname == "TimeFrame" ][0]
+    timeunit = alignment_view.metadata.contains[timeframe_at_type]["timeUnit"]
     # TODO: wanted to use "mmif.get_alignments(AnnotationTypes.TimeFrame, Uri.TOKEN)"
     # but that gave errors so I gave up on it
-    token_idx = {a.id:a for a in annotations if str(a.at_type).endswith('Token')}
-    timeframe_idx = {a.id:a for a in annotations if str(a.at_type).endswith('TimeFrame')}
-    alignments = [a for a in annotations if str(a.at_type).endswith('Alignment')]
+    token_idx = {a.id:a for a in annotations if a.at_type.shortname == "Token"}
+    timeframe_idx = {a.id:a for a in annotations if a.at_type.shortname == "TimeFrame"}
+    alignments = [a for a in annotations if a.at_type.shortname == "Alignment"]
     vtt_start = None
     texts = []
     for alignment in alignments:
@@ -45,11 +48,13 @@ def get_alignments(alignment_view):
             # ISO format can have up to 6 below the decimal point, on the other hand
             # Assuming here that start and end are in miliseconds
             start, end, text = start_end_text
+            start_kwarg, end_kwarg = {timeunit: float(start)}, {timeunit: float(end)}
+            start, end = timedelta(**start_kwarg), timedelta(**end_kwarg)
             if not vtt_start:
-                vtt_start = f'{start // 60000:02d}:{start % 60000 // 1000}.{start % 1000:03d}'
+                vtt_start = f'{start.seconds // 3600 :02d}:{start.seconds:02d}.{start.microseconds // 1000 :03d}'
             texts.append(text)
             if len(texts) > 8:
-                vtt_end = f'{end // 60000:02d}:{end % 60000 // 1000}.{end % 1000:03d}'
+                vtt_end = f'{end.seconds // 3600 :02d}:{end.seconds:02d}.{end.microseconds // 1000 :03d}'
                 vtt_file.write(f'{vtt_start} --> {vtt_end}\n{" ".join(texts)}\n\n')
                 vtt_start = None
                 texts = []
@@ -120,9 +125,8 @@ def get_boxes(mmif):
 def get_document_type_short_form(document):
     """Returns 'Video', 'Text', 'Audio' or 'Image' from the document type of
     the document."""
-    document_type = os.path.split(str(document.at_type))[1]
+    document_type = document.at_type.shortname
     return document_type[:-8]
-
 
 def prep_annotations(mmif):
     """Prepare annotations from the views, and return a list of pairs of tabname
@@ -168,7 +172,7 @@ def get_video_path(mmif):
 def create_info(mmif):
     s = StringIO('Howdy')
     for document in mmif.documents:
-        at_type = str(document.at_type).rsplit('/', 1)[-1]
+        at_type = document.at_type.shortname
         location = document.location
         s.write("%s  %s\n" % (at_type, location))
     s.write('\n')
@@ -178,7 +182,7 @@ def create_info(mmif):
         s.write('%s  %s  %s  %d\n' % (view.id, app, status, len(view.annotations)))
         if len(view.annotations) > 0:
             s.write('\n')
-            types = Counter([str(a.at_type).rsplit('/', 1)[-1]
+            types = Counter([a.at_type.shortname
                              for a in view.annotations])
             for attype, count in types.items():
                 s.write('    %4d %s\n' % (count, attype))
@@ -194,24 +198,23 @@ def create_annotation_tables(mmif):
                 % (view.id, view.metadata.app, status, len(view.annotations)))
         s.write("<blockquote>\n")
         s.write("<table cellspacing=0 cellpadding=5 border=1>\n")
+        limit_len = lambda str : str[:500] + "  . . .  }" if len(str) > 500 else str
         for annotation in view.annotations:
             s.write('  <tr>\n')
             s.write('    <td>%s</td>\n' % annotation.id)
-            s.write('    <td>%s</td>\n' % str(annotation.at_type).split('/')[-1])
-            s.write('    <td>%s</td>\n' % get_properties(annotation))
+            s.write('    <td>%s</td>\n' % annotation.at_type.shortname)
+            s.write('    <td>%s</td>\n' % limit_len(get_properties(annotation)))
             s.write('  </tr>\n')
         s.write("</table>\n")
         s.write("</blockquote>\n")
     return s.getvalue()
-    return '<pre>%s</pre>\n' % s.getvalue()
-
 
 
 def get_document_ids(view, annotation_type):
     metadata = view.metadata.contains.get(annotation_type)
     ids = set([metadata['document']]) if 'document' in metadata else set()
     for annotation in view.annotations:
-        if str(annotation.at_type).endswith(str(annotation_type)):
+        if annotation.at_type.shortname == str(annotation_type):
             try:
                 ids.add(annotation.properties["document"])
             except KeyError:
@@ -226,7 +229,7 @@ def get_alignment_views(mmif):
     needed_types = set(['TextDocument', 'Token', 'TimeFrame', 'Alignment'])
     for view in mmif.views:
         annotation_types = view.metadata.contains.keys()
-        annotation_types = [os.path.split(str(at))[-1] for at in annotation_types]
+        annotation_types = [at.shortname for at in annotation_types]
         if needed_types.issubset(annotation_types):
             views.append(view)
     return views
@@ -236,7 +239,6 @@ def get_alignment_views(mmif):
 # Remder Media as HTML ------------
 
 def html_video(vpath, vtt_srcview=None):
-    print(vpath)
     vpath = url2posix(vpath)
     html = StringIO()
     html.write('<video id="vid" controls>\n')
@@ -246,7 +248,7 @@ def html_video(vpath, vtt_srcview=None):
         # use only basename because "static" directory is mapped to '' route by
         # `static_url_path` param
         src = os.path.basename(vtt_path)
-        html.write(f'    <track kind="subtitles" srclang="en" src="{src}" default>\n')
+        html.write(f'    <track kind="subtitles" srclang="en" src="{src}" label="English" default>\n')
     html.write("</video>\n")
     return html.getvalue()
 
@@ -291,25 +293,27 @@ def url2posix(path):
 # Interactive MMIF Tab -----------
 
 def render_interactive_mmif(mmif):
-    return render_template('interactive.html', mmif=mmif, is_aligned=is_properly_aligned(mmif))
+    return render_template('interactive.html', mmif=mmif, aligned_views=get_aligned_views(mmif))
 
-def is_properly_aligned(mmif):
-    """Check if Alignment placement is standard (for tree display)"""
+# Functions for checking if view can be rendered with alignment highlighting
+def get_aligned_views(mmif):
+    """Return list of properly aligned views (for tree display)"""
+    aligned_views = []
     for view in mmif.views:
-        if any([str(at_type).endswith('Alignment') for at_type in view.metadata.contains]):
-            if check_view_alignment(view.annotations) == False:
-                return False
-    return True
+        if any([at_type.shortname == "Alignment" for at_type in view.metadata.contains]):
+            if check_view_alignment(view.annotations) == True:
+                aligned_views.append(view.id)
+    return aligned_views
 
 def check_view_alignment(annotations):
     anno_stack = []
     for annotation in annotations:
-        if str(annotation.at_type).endswith('Alignment'):
+        if annotation.at_type.shortname == "Alignment":
             anno_stack.insert(0, annotation.properties)
         else:
             anno_stack.append(annotation.id)
         if len(anno_stack) == 3:
-            if not (anno_stack[0]["source"] in anno_stack and anno_stack[0]["target"] in anno_stack):
+            if type(anno_stack[0]) == str or not (anno_stack[0]["source"] in anno_stack and anno_stack[0]["target"] in anno_stack):
                 return False
             anno_stack = []
     return True
@@ -330,7 +334,7 @@ def create_ner_visualization(mmif, view):
         # all the view's named entities refer to the same text document (kaldi)
         document_ids = get_document_ids(view, Uri.NE)
         return displacy.visualize_ner(mmif, view, document_ids[0], app.root_path)
-    except KeyError:
+    except KeyError as e:
         # the view's entities refer to more than one text document (tessearct)
         pass
 def get_status(view):
@@ -353,19 +357,22 @@ def get_properties(annotation):
 def prepare_ocr_visualization(mmif, view):
     """ Visualize OCR by extracting image frames with BoundingBoxes from video"""
     frames, text_docs, alignments = {}, {}, {}
+    vid_path = get_video_path(mmif)
+    cv2_vid = cv2.VideoCapture(vid_path)
+    fps = cv2_vid.get(cv2.CAP_PROP_FPS)
     for anno in view.annotations:
         try:
-            if str(anno.at_type).endswith('BoundingBox'):
-                frames = add_bounding_box(anno, frames)
+            if anno.at_type.shortname == "BoundingBox":
+                frames = add_bounding_box(anno, frames, fps)
 
-            elif str(anno.at_type).endswith('TextDocument'):
+            elif anno.at_type.shortname == "TextDocument":
                 t = anno.properties["text_value"]
                 if t:
                     text_id = anno.properties["id"]
                     # Format string so it is JSON-readable
                     text_docs[text_id] = re.sub(r'([\\\/\|\"\'])', r'\1 ', t)
 
-            elif str(anno.at_type).endswith('Alignment'):
+            elif anno.at_type.shortname == "Alignment":
                 source = anno.properties["source"]
                 target = anno.properties["target"]
                 alignments[source] = target
@@ -375,10 +382,8 @@ def prepare_ocr_visualization(mmif, view):
             pass
 
     # Generate pages (necessary to reduce IO cost) and render
-    vid_path = get_video_path(mmif)
-    cv2_vid = cv2.VideoCapture(vid_path)
-    fps = cv2_vid.get(cv2.CAP_PROP_FPS)
     frames_list = [(k, v) for k, v in frames.items()]
-    frames_list = align_annotations(frames_list, alignments, text_docs, fps)
+    if any(at_type.shortname == "Alignment" for at_type in view.metadata.contains):
+        frames_list = align_annotations(frames_list, alignments, text_docs)
     frames_pages = paginate(frames_list)
     return render_ocr(vid_path, frames_pages, 0)

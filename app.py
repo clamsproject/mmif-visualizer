@@ -19,13 +19,11 @@ def index():
 def ocrpage():
     data = request.form
     try:
-        # print(html.unescape(data['frames_pages']))
         frames_pages = eval(html.unescape(data['frames_pages']))
         page_number = int(data['page_number'])
 
         return (render_ocr(data['vid_path'], frames_pages, page_number))
     except Exception as e:
-        print(html.unescape(data['frames_pages']))
         return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
         pass
 
@@ -35,8 +33,11 @@ def upload():
     # unavailable because no secret key was set). This was solved in the
     # __main__ block by setting a key.
     if request.method == 'POST':
-        # check if the post request has the file part
-        if 'file' not in request.files:
+        # Check if request is coming from elasticsearch
+        if 'data' in request.form:
+            return render_mmif(request.form['data'])
+        # Otherwise, check if the post request has the file part
+        elif 'file' not in request.files:
             flash('WARNING: post request has no file part')
             return redirect(request.url)
         file = request.files['file']

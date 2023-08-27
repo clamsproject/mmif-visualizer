@@ -75,7 +75,7 @@
             <li data-jstree='{"type":"view"}'>{{view.metadata.app}} ({{view.id}})
                 <ul>
                     {% for annotation in view.annotations %}
-                        <li data-jstree='{"type": "{{"annotation-highlighted" if cluster.highlighted and is_aligned else "annotation"}}"}'>{{annotation.at_type}}
+                        <li data-jstree='{"type": "{{"annotation-highlighted" if cluster.highlighted and view.id in aligned_views else "annotation"}}"}'>{{annotation.at_type}}
                             <ul>
                                 <li data-jstree='{"type":"properties"}'>{{annotation.properties}}</li>
                             </ul>
