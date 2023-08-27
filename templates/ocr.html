@@ -1,5 +1,5 @@
-<div id="ocr_tab">
-    {% for frame_num, frame in frames_pages[page_number] %}
+<div id="ocr_tab_{{view_id}}">
+    {% for frame_num, frame in page %}
         {% set filename = frame["id"] %}
         {% set id = frame["id"] %}
         {% set boxes = frame["boxes"] %}
@@ -11,8 +11,20 @@
                 {% include "image.html" %}
                 <div>
                     <h4>
-                        frame: {{frame_num}}<br>
-                        timestamp: <a class="timestamp" onclick="SetCurTime('{{secs}}')">{{frame["timestamp"]}}</a><br>
+                        {% if frame["frame_num"] %}
+                            frame: {{frame["frame_num"]}}<br>
+                        {% endif %}
+                        {% if frame["range"] %}
+                            frames: {{frame["range"][0]}} - {{frame["range"][1]}}<br>
+                        {% endif %}
+                        {% if frame["timestamp"] %}
+                            timestamp: <a class="timestamp" onclick="SetCurTime('{{secs}}')">{{frame["timestamp"]}}</a><br>
+                        {% endif %}
+                        {% if frame["timestamp_range"] %}
+                            {% set sec_range = frame["sec_range"] %}
+                            timestamps: <a class="timestamp" onclick="SetCurTime('{{sec_range[0]}}')">{{frame["timestamp_range"][0]}}</a> - <a class="timestamp" onclick="SetCurTime('{{sec_range[1]}}')">{{frame["timestamp_range"][1]}}</a><br>
+                        {% endif %}
+
                         {% if frame["text"] %}
                             text detected:<br>
                             {% for text in frame["text"] %}
@@ -24,9 +36,10 @@
             </div>
         </div>
     {% endfor %}
-    <div id="page-buttons" n_pages="{{frames_pages | length}}">
-    </div>
-
+    {% if n_pages > 1 %}
+        <div class="page-buttons">
+        </div>
+    {% endif %}
 </div>
 
 <style>
@@ -78,8 +91,11 @@
     canvas {
         align-self:flex-start;
     }
-    #page-buttons {
+    .page-buttons {
         margin-top: 20px
+    }
+    #page-input {
+        width: 30px;
     }
     .page-button {
         margin-right: 10px
@@ -101,11 +117,10 @@ BACKWARD = -1
 FORWARD = -2
 
 function changePage(page) {
-        var pageChange
         var data = {
             "vid_path": "{{vid_path}}",
-            "frames_pages": "{{frames_pages}}",
-            "page_number": parseInt("{{page_number}}"), 
+            "view_id": "{{view_id}}",
+            "page_number": parseInt("{{page_number}}")
         }
         if (page == BACKWARD) {
             data["page_number"] -= 1
@@ -116,14 +131,17 @@ function changePage(page) {
         else {
             data["page_number"] = page;
         }
-        $.ajax({
+        if (data["page_number"] >= 0 && data["page_number"] < parseInt("{{n_pages}}")) {
+            $.ajax({
             type:'POST',
             url:'/ocrpage',
-            data: data,
+            contentType: "application/json",
+            data: JSON.stringify(data),
             success: function(res_html){
-              $('#ocr_tab').parent().html(res_html);
+              $('#ocr_tab_{{view_id}}').parent().html(res_html);
             }
         })
+        }
     }
   
     function SetCurTime(timeValue) {
@@ -131,12 +149,16 @@ function changePage(page) {
         vid.currentTime = timeValue;
     }
 
+    function enterPageNumber() {
+        changePage(document.getElementById('page-input').value-1)
+        }
+
     $(document).ready(function() {
         
         // Duplicate frame groups
         $(".collapsible-True").each(function() {
             $(this).nextUntil(".collapsible-False", ".collapsible-True").remove();
-            $(this).nextUntil(".repeat-False, #page-buttons").not(".repeat-False, #page-buttons").wrapAll('<div class="repeats" />')
+            $(this).nextUntil(".repeat-False, #page-buttons").not(".repeat-False, .page-buttons").wrapAll('<div class="repeats" />')
             $(this).text(function(i, text) {
                 n_repeats = $(this).next().children(".repeat-True").length;
                 return text == `SHOW DUPLICATE(S)` ? `SHOW ${n_repeats} DUPLICATE(S)` : text
@@ -152,23 +174,31 @@ function changePage(page) {
             })
         })
 
-        $("#page-buttons").each(function() {
+        $("#ocr_tab_{{view_id}} .page-buttons").each(function() {
             page_number = parseInt("{{page_number}}")
+            n_pages = parseInt("{{n_pages}}")
+
             if (page_number > 0) {
+                $(this).append(`<button class="page-button" onClick=changePage(0)>\<\<</button>`)
                 $(this).append(`<button class="page-button" onClick=changePage(${-1})>\<</button>`)
             }
-            n_pages = $(this).attr("n_pages");
-            for (var i = 0; i < n_pages; i++) {
+
+            lower_bound = page_number < 6 ? 0 : page_number-5;
+            upper_bound = n_pages - page_number < 7 ? n_pages : page_number+6
+            for (var i = lower_bound; i < upper_bound; i++) {
                 var id = ""
                 if (i == page_number) {
                     id = "cur-page-button"
                 }
                 $(this).append(`<button class="page-button" id="${id}" onClick=changePage(${i})>${i+1}</button>`)
             }
+
             if (page_number < n_pages-1) {
                 $(this).append(`<button class="page-button" onClick=changePage(${-2})>\></button>`)
+                $(this).append(`<button class="page-button" onClick=changePage(${n_pages-1})>\>\></button>`)
             }
-        })
 
-    })  
+            $(this).append(`<input id="page-input" onKeyPress="if(event.keyCode==13) enterPageNumber();" />`)
+        })
+    })
   </script>

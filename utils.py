@@ -8,8 +8,10 @@ import displacy
 import tempfile
 import re
 import json
+import html
 
 from flask import Flask, render_template
+from flask_session import Session
 from werkzeug.utils import secure_filename
 
 from mmif.serialize import Mmif, View
@@ -25,6 +27,7 @@ from datetime import timedelta
 
 # these two static folder-related params are important, do not remove
 app = Flask(__name__, static_folder='static', static_url_path='')
+app.secret_key = 'your_secret_key_here'
 
 def get_alignments(alignment_view):
     vtt_file = tempfile.NamedTemporaryFile('w', dir="static/", suffix='.vtt', delete=False)
@@ -156,7 +159,7 @@ def prep_annotations(mmif):
         if not ocr_view.annotations:
             continue
         visualization = prepare_ocr_visualization(mmif, ocr_view)
-        tabname = "OCR-%s" % ocr_view.id if use_id else "OCR"
+        tabname = "Frames-%s" % ocr_view.id
         tabs.append((tabname, visualization))
     return tabs
 
@@ -356,34 +359,17 @@ def get_properties(annotation):
 
 def prepare_ocr_visualization(mmif, view):
     """ Visualize OCR by extracting image frames with BoundingBoxes from video"""
-    frames, text_docs, alignments = {}, {}, {}
+    # frames, text_docs, alignments = {}, {}, {}
     vid_path = get_video_path(mmif)
     cv2_vid = cv2.VideoCapture(vid_path)
     fps = cv2_vid.get(cv2.CAP_PROP_FPS)
-    for anno in view.annotations:
-        try:
-            if anno.at_type.shortname == "BoundingBox":
-                frames = add_bounding_box(anno, frames, fps)
 
-            elif anno.at_type.shortname == "TextDocument":
-                t = anno.properties["text_value"]
-                if t:
-                    text_id = anno.properties["id"]
-                    # Format string so it is JSON-readable
-                    text_docs[text_id] = re.sub(r'([\\\/\|\"\'])', r'\1 ', t)
-
-            elif anno.at_type.shortname == "Alignment":
-                source = anno.properties["source"]
-                target = anno.properties["target"]
-                alignments[source] = target
-
-        except Exception as e:
-            print(f"Unexpected error of type {type(e)}: {e}")
-            pass
+    ocr_frames = get_ocr_frames(view, mmif, fps)
 
     # Generate pages (necessary to reduce IO cost) and render
-    frames_list = [(k, v) for k, v in frames.items()]
-    if any(at_type.shortname == "Alignment" for at_type in view.metadata.contains):
-        frames_list = align_annotations(frames_list, alignments, text_docs)
+    frames_list = [(k, vars(v)) for k, v in ocr_frames.items()]
+    find_duplicates(frames_list)
     frames_pages = paginate(frames_list)
-    return render_ocr(vid_path, frames_pages, 0)
+    # Save page list as temp file
+    save_json(frames_pages, view.id)
+    return render_ocr(vid_path, view.id, 0)

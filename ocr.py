@@ -1,45 +1,108 @@
 import datetime
+import pathlib
+
 import cv2
 import tempfile
 import json
+import re
+import html
 
-from flask import render_template
+from flask import render_template, session
+# from utils import app
 
 
-def add_bounding_box(anno, frames, fps):
-    frame_num = anno.properties.get("frame") or anno.properties.get("timePoint")
-    box_id = anno.properties["id"]
-    boxType = anno.properties["boxType"]
-    coordinates = anno.properties["coordinates"]
-    x = coordinates[0][0]
-    y = coordinates[0][1]
-    w = coordinates[3][0] - x
-    h = coordinates[3][1] - y
-    box = [box_id, boxType, [x, y, w, h]]
-    if frame_num in frames.keys():
-        frames[frame_num]["boxes"].append(box)
-        frames[frame_num]["bb_ids"].append(box_id)
+class OCRFrame():
+    """Class representing an (aligned or otherwise) set of OCR annotations for a single frame"""
+
+    def __init__(self, anno, fps):
+        self.text = []
+        self.fps = fps
+        self.boxes = []
+        self.anno_ids = []
+        self.timestamp = None
+        self.secs = None
+        self.repeat = False
+        self.frame_num = None
+        self.range = None
+        self.timestamp_range = None
+        self.sec_range = None
+
+        self.update(anno)
+
+    def update(self, anno):
+        if anno.at_type.shortname == "BoundingBox":
+            self.add_bounding_box(anno)
+
+        elif anno.at_type.shortname == "TimeFrame":
+            self.add_timeframe(anno)
+
+        elif anno.at_type.shortname == "TextDocument":
+            t = anno.properties.get("text_value") or anno.properties.get("text").value
+            if t:
+                self.text.append(re.sub(r'([\\\/\|\"\'])', r'\1 ', t))
+
+    def add_bounding_box(self, anno):
+        self.frame_num = anno.properties.get(
+            "frame") or anno.properties.get("timePoint")
+        box_id = anno.properties["id"]
+        boxType = anno.properties["boxType"]
+        coordinates = anno.properties["coordinates"]
+        x = coordinates[0][0]
+        y = coordinates[0][1]
+        w = coordinates[3][0] - x
+        h = coordinates[3][1] - y
+        box = [box_id, boxType, [x, y, w, h]]
+        self.boxes.append(box)
+        self.anno_ids.append(box_id)
+        if self.fps:
+            secs = int(self.frame_num/self.fps)
+            self.timestamp = str(datetime.timedelta(seconds=secs))
+            self.secs = secs
+
+    def add_timeframe(self, anno):
+        start, end = anno.properties.get('start'), anno.properties.get('end')
+        self.range = (start, end)
+        if self.fps:
+            start_secs, end_secs = int(start/self.fps), int(end/self.fps)
+            self.timestamp_range = (str(datetime.timedelta(seconds=start_secs)), str(datetime.timedelta(seconds=end_secs)))
+            self.sec_range = (start_secs, end_secs)
+
+
+def find_annotation(anno_id, view, mmif):
+    if mmif.id_delimiter in anno_id:
+        view_id, anno_id = anno_id.split(mmif.id_delimiter)
+        view = mmif.get_view_by_id(view_id)
+    return view.get_annotation_by_id(anno_id)
+
+
+def get_ocr_frames(view, mmif, fps):
+    frames = {}
+    full_alignment_type = [
+        at_type for at_type in view.metadata.contains if at_type.shortname == "Alignment"]
+    # If view contains alignments
+    if full_alignment_type:
+        for alignment in view.get_annotations(full_alignment_type[0]):
+            source = find_annotation(alignment.properties["source"], view, mmif)
+            target = find_annotation(alignment.properties["target"], view, mmif)
+            frame = OCRFrame(source, fps)
+            i = frame.frame_num if frame.frame_num is not None else frame.range
+            if i in frames.keys():
+                frames[i].update(source)
+                frames[i].update(target)
+            else:
+                frame.update(target)
+                frames[i] = frame
     else:
-        frames[frame_num] = {"boxes": [box], "text": [], "bb_ids": [box_id], "timestamp": None, "secs": None, "repeat": False}
-    if fps:
-        secs = int(frame_num/fps)
-        frames[frame_num]["timestamp"] = str(datetime.timedelta(seconds=secs))
-        frames[frame_num]["secs"] = secs
-
+        for annotation in view.get_annotations():
+            frame = OCRFrame(annotation, fps)
+            i = frame.frame_num if frame.frame_num is not None else frame.range
+            if i is None:
+                continue
+            if i in frames.keys():
+                frames[i].update(annotation)
+            else:
+                frames[i] = frame
     return frames
-
-
-def align_annotations(frames_list, alignments, text_docs):
-    """Link alignments with frames"""
-    prev_frame = None
-    for frame_num, frame in frames_list:
-        for box_id in frame["bb_ids"]:
-            text_id = alignments[box_id]
-            frame["text"].append(text_docs[text_id])
-        if is_duplicate_ocr_frame(frame, prev_frame):
-            frame["repeat"] = True
-        prev_frame = frame
-    return frames_list
 
 
 def paginate(frames_list):
@@ -56,25 +119,43 @@ def paginate(frames_list):
         if not frame["repeat"]:
             n_frames_on_page += 1
 
-    return pages
+    return {i: page for (i, page) in enumerate(pages)}
 
-def render_ocr(vid_path, frames_pages, page_number):
+def render_ocr(vid_path, view_id, page_number):
     """Iterate through frames and display the contents/alignments."""
     # Path for storing temporary images generated by cv2
     cv2_vid = cv2.VideoCapture(vid_path)
-    for frame_num, frame in frames_pages[page_number]:
+    f = open(session[f"{view_id}-page-file"])
+    frames_pages = json.load(f)
+    page = frames_pages[str(page_number)]
+    for frame_num, frame in page:
+        # If index is range instead of frame...
+        if frame.get("range"):
+            frame_num = (int(frame["range"][0]) + int(frame["range"][1])) / 2
         cv2_vid.set(1, frame_num)
         _, frame_cap = cv2_vid.read()
         with tempfile.NamedTemporaryFile(
-            prefix="/app/static/tmp/", suffix=".jpg", delete=False) as tf:
+                prefix=str(pathlib.Path(__file__).parent /'static'/'tmp'), suffix=".jpg", delete=False) as tf:
             cv2.imwrite(tf.name, frame_cap)
             # "id" is just the name of the temp image file
-            frame["id"] = tf.name[12:]            
+            frame["id"] = pathlib.Path(tf.name).name
 
-    return render_template('ocr.html', 
-                           vid_path=vid_path, 
-                           frames_pages=frames_pages, 
-                           page_number=page_number)
+    return render_template('ocr.html',
+                           vid_path=vid_path,
+                           view_id=view_id,
+                           page=page,
+                           n_pages=len(frames_pages),
+                           page_number=str(page_number))
+
+
+def find_duplicates(frames_list):
+    """Find duplicate frames"""
+    prev_frame = None
+    for frame_num, frame in frames_list:
+        if is_duplicate_ocr_frame(frame, prev_frame):
+            frame["repeat"] = True
+        prev_frame = frame
+    return frames_list
 
 
 def is_duplicate_ocr_frame(frame, prev_frame):
@@ -86,6 +167,7 @@ def is_duplicate_ocr_frame(frame, prev_frame):
                 return True
     return False
 
+
 def round_boxes(boxes):
     # To account for jittery bounding boxes in OCR annotations
     rounded_boxes = []
@@ -96,11 +178,19 @@ def round_boxes(boxes):
         rounded_boxes.append(rounded_box)
     return rounded_boxes
 
+
 def get_ocr_views(mmif):
     """Return OCR views, which have TextDocument, BoundingBox, and Alignment annotations"""
     views = []
-    ocr_apps = ["east-textdetection", "tesseract"]
+    ocr_apps = ["east-textdetection", "tesseract", "chyron-text-recognition", "slatedetection", "barsdetection", "parseq-wrapper"]
     for view in mmif.views:
-        if any([view.metadata.app.find(ocr_app) for ocr_app in ocr_apps]):
+        if any([ocr_app in view.metadata.app for ocr_app in ocr_apps]):
             views.append(view)
     return views
+
+def save_json(dict, view_id):
+    # jsonified_pages = json.dumps(dict)
+    with tempfile.NamedTemporaryFile(prefix=str(pathlib.Path(__file__).parent /'static'/'tmp'), suffix=".json", delete=False) as tf:
+        pages_json = open(tf.name, "w")
+        json.dump(dict, pages_json)
+        session[f"{view_id}-page-file"] = tf.name

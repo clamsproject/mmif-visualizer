@@ -1,2 +1,4 @@
 spacy==2.3.2
-clams-python==1.0.0
+clams-python==1.0.*
+flask-session
+opencv-python==4.*
