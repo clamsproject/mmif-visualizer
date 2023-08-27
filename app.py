@@ -85,6 +85,7 @@ def render_mmif(mmif_str, viz_id):
     mmif = Mmif(mmif_str)
     media = documents_to_htmls(mmif, viz_id)
     annotations = prep_annotations(mmif, viz_id)
+    app.logger.debug(f"Prepared Annotations: {annotations.keys()}")
     return render_template('player.html',
                            media=media, annotations=annotations)
 
@@ -94,19 +95,24 @@ def upload_file(in_mmif):
     in_mmif_bytes = in_mmif.read()
     in_mmif_str = in_mmif_bytes.decode('utf-8')
     viz_id = hashlib.sha1(in_mmif_bytes).hexdigest()
-    app.logger.debug(viz_id)
+    app.logger.debug(f"Visualization ID: {viz_id}")
     path = cache.get_cache_path() / viz_id
-    os.makedirs(path, exist_ok=True)
-    set_last_access(path)
-    with open(path / 'file.mmif', 'w') as in_mmif_file:
-        in_mmif_file.write(in_mmif_str)
-    html_page = render_mmif(in_mmif_str, viz_id)
-    with open(os.path.join(path, "index.html"), "w") as f:
-        f.write(html_page)
-    # Perform cleanup
-    t = Thread(target=cleanup)
-    t.daemon = True
-    t.run()
+    app.logger.debug(f"Visualization Directory: {path}")
+    try:
+        os.makedirs(path)
+        set_last_access(path)
+        with open(path / 'file.mmif', 'w') as in_mmif_file:
+            in_mmif_file.write(in_mmif_str)
+        html_page = render_mmif(in_mmif_str, viz_id)
+        with open(os.path.join(path, "index.html"), "w") as f:
+            f.write(html_page)
+    except FileExistsError:
+        app.logger.debug("Visualization already cached")
+    finally:
+        # Perform cleanup
+        t = Thread(target=cleanup)
+        t.daemon = True
+        t.run()
 
     agent = request.headers.get('User-Agent')
     if 'curl' in agent.lower():

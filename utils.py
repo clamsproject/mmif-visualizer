@@ -146,7 +146,7 @@ def prep_annotations(mmif, viz_id):
     for ocr_view in ocr_views:
         if not ocr_view.annotations:
             continue
-        tabname = "Frames-%s" % ocr_view.id
+        tabname = "Thumbnails-%s" % ocr_view.id
         visualization = render_template("pre-ocr.html", view_id=ocr_view.id, tabname=tabname, mmif_id=viz_id)
         tabs.append((tabname, visualization))
     return tabs
