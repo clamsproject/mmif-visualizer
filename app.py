@@ -96,6 +96,7 @@ def send_js(path):
 def render_mmif(mmif_str, viz_id):
     mmif = Mmif(mmif_str)
     media = documents_to_htmls(mmif, viz_id)
+    app.logger.debug(f"Prepared Media: {[m[0] for m in media]}")
     annotations = prep_annotations(mmif, viz_id)
     app.logger.debug(f"Prepared Annotations: {[annotation[0] for annotation in annotations]}")
     return render_template('player.html',
@@ -114,6 +115,7 @@ def upload_file(in_mmif):
         os.makedirs(path)
         set_last_access(path)
         with open(path / 'file.mmif', 'w') as in_mmif_file:
+            app.logger.debug(f"Writing original MMIF to {path / 'file.mmif'}")
             in_mmif_file.write(in_mmif_str)
         html_page = render_mmif(in_mmif_str, viz_id)
         with open(os.path.join(path, "index.html"), "w") as f:
