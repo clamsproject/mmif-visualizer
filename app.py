@@ -1,16 +1,15 @@
+import hashlib
 import os
 import secrets
 import sys
-from pathlib import Path
 from threading import Thread
 
-import shortuuid
-from flask import request, render_template, flash, send_from_directory, session, redirect
+from flask import request, render_template, flash, send_from_directory, redirect
 from mmif.serialize import Mmif
 
 import cache
 from cache import set_last_access, cleanup
-from utils import app, render_ocr, get_media, prep_annotations, prepare_ocr_visualization
+from utils import app, render_ocr, documents_to_htmls, prep_annotations, prepare_ocr_visualization
 
 
 @app.route('/')
@@ -82,29 +81,28 @@ def send_js(path):
     return send_from_directory("uv", path)
 
 
-def render_mmif(mmif_str):
+def render_mmif(mmif_str, viz_id):
     mmif = Mmif(mmif_str)
-    media = get_media(mmif)
-    annotations = prep_annotations(mmif)
+    media = documents_to_htmls(mmif, viz_id)
+    annotations = prep_annotations(mmif, viz_id)
     return render_template('player.html',
                            media=media, annotations=annotations)
 
 
-def upload_file(file):
+def upload_file(in_mmif):
     # Save file locally
-    uuid = shortuuid.uuid()
-    session["mmif_id"] = uuid
-    app.logger.debug(uuid)
-    path = Path(app.root_path) / 'static' / 'tmp' / uuid
-    os.makedirs(path)
+    in_mmif_bytes = in_mmif.read()
+    in_mmif_str = in_mmif_bytes.decode('utf-8')
+    viz_id = hashlib.sha1(in_mmif_bytes).hexdigest()
+    app.logger.debug(viz_id)
+    path = cache.get_cache_path() / viz_id
+    os.makedirs(path, exist_ok=True)
     set_last_access(path)
-    file.save(os.path.join(path, "file.mmif"))
-    with open(os.path.join(path, "file.mmif")) as fh:
-        mmif_str = fh.read()
-    html_page = render_mmif(mmif_str)
+    with open(path / 'file.mmif', 'w') as in_mmif_file:
+        in_mmif_file.write(in_mmif_str)
+    html_page = render_mmif(in_mmif_str, viz_id)
     with open(os.path.join(path, "index.html"), "w") as f:
         f.write(html_page)
-
     # Perform cleanup
     t = Thread(target=cleanup)
     t.daemon = True
@@ -112,8 +110,8 @@ def upload_file(file):
 
     agent = request.headers.get('User-Agent')
     if 'curl' in agent.lower():
-        return f"Visualization ID is {uuid}\nYou can access the visualized file at /display/{uuid}\n"
-    return redirect(f"/display/{uuid}", code=301)
+        return f"Visualization ID is {viz_id}\nYou can access the visualized file at /display/{viz_id}\n"
+    return redirect(f"/display/{viz_id}", code=301)
 
 
 if __name__ == '__main__':

@@ -10,7 +10,11 @@ lock = threading.Lock()
 
 
 def get_cache_path():
-    return pathlib.Path(app.root_path) / "static" / "tmp"
+    return pathlib.Path(app.static_folder) / "tmp"
+
+
+def get_cache_relpath(full_path):
+    return str(full_path)[len(app.static_folder):]
 
 
 def set_last_access(path):
