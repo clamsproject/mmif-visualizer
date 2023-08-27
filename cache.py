@@ -17,6 +17,17 @@ def get_cache_relpath(full_path):
     return str(full_path)[len(app.static_folder):]
 
 
+def invalidate_cache(viz_ids):
+    if not viz_ids:
+        app.logger.debug("Invalidating entire cache.")
+        shutil.rmtree(get_cache_path())
+        os.makedirs(get_cache_path())
+    else:
+        for v in viz_ids:
+            app.logger.debug(f"Invalidating {v} from cache.")
+            shutil.rmtree(get_cache_path() / v)
+
+
 def set_last_access(path):
     with open(os.path.join(path, "last_access.txt"), "w") as f:
         f.write(str(time.time()))

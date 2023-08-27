@@ -63,6 +63,18 @@ def upload():
     return render_template('upload.html')
 
 
+@app.route('/decache', methods=['GET', 'POST'])
+def invalidate_cache():
+    app.logger.debug(f"Request to invalidate cache on {request.args}")
+    if not request.args.get('viz_id'):
+        cache.invalidate_cache()
+        return redirect("/upload")
+    viz_id = request.args.get('viz_id')
+    in_mmif = open(cache.get_cache_path() / viz_id / 'file.mmif', 'rb').read()
+    cache.invalidate_cache([viz_id])
+    return upload_file(in_mmif)
+
+
 @app.route('/display/<viz_id>')
 def display(viz_id):
     try:
@@ -85,14 +97,14 @@ def render_mmif(mmif_str, viz_id):
     mmif = Mmif(mmif_str)
     media = documents_to_htmls(mmif, viz_id)
     annotations = prep_annotations(mmif, viz_id)
-    app.logger.debug(f"Prepared Annotations: {annotations.keys()}")
+    app.logger.debug(f"Prepared Annotations: {[annotation[0] for annotation in annotations]}")
     return render_template('player.html',
-                           media=media, annotations=annotations)
+                           media=media, viz_id=viz_id, annotations=annotations)
 
 
 def upload_file(in_mmif):
     # Save file locally
-    in_mmif_bytes = in_mmif.read()
+    in_mmif_bytes = in_mmif if isinstance(in_mmif, bytes) else in_mmif.read()
     in_mmif_str = in_mmif_bytes.decode('utf-8')
     viz_id = hashlib.sha1(in_mmif_bytes).hexdigest()
     app.logger.debug(f"Visualization ID: {viz_id}")
