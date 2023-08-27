@@ -1,4 +1,5 @@
 spacy==2.3.2
-clams-python==1.0.*
+mmif-python==1.0.8
+mmif-python[utils]==1.0.8
 flask-session
 opencv-python==4.*

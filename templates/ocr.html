@@ -1,3 +1,4 @@
+
 <div id="ocr_tab_{{view_id}}">
     {% for frame_num, frame in page %}
         {% set filename = frame["id"] %}
@@ -11,18 +12,24 @@
                 {% include "image.html" %}
                 <div>
                     <h4>
-                        {% if frame["frame_num"] %}
+                        {% if frame["frame_num"] is not none %}
                             frame: {{frame["frame_num"]}}<br>
                         {% endif %}
-                        {% if frame["range"] %}
+                        {% if frame["range"] is not none %}
                             frames: {{frame["range"][0]}} - {{frame["range"][1]}}<br>
                         {% endif %}
-                        {% if frame["timestamp"] %}
+                        {% if frame["timestamp"] is not none %}
                             timestamp: <a class="timestamp" onclick="SetCurTime('{{secs}}')">{{frame["timestamp"]}}</a><br>
                         {% endif %}
-                        {% if frame["timestamp_range"] %}
+                        {% if frame["timestamp_range"] is not none %}
                             {% set sec_range = frame["sec_range"] %}
                             timestamps: <a class="timestamp" onclick="SetCurTime('{{sec_range[0]}}')">{{frame["timestamp_range"][0]}}</a> - <a class="timestamp" onclick="SetCurTime('{{sec_range[1]}}')">{{frame["timestamp_range"][1]}}</a><br>
+                        {% endif %}
+                        {% if frame["frametype"] is not none %}
+                            frame type: {{frame["frametype"]}}<br>
+                        {% endif %}
+                        {% if frame["boxtypes"] %}
+                            box types: {{frame["boxtypes"]}}<br>
                         {% endif %}
 
                         {% if frame["text"] %}

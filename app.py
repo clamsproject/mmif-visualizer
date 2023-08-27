@@ -2,27 +2,39 @@ import os
 import pathlib
 import sys
 import secrets
+import json
+import html
 
-from flask import request, render_template, flash, redirect, send_from_directory
+from flask import request, render_template, flash, redirect, send_from_directory, session
 from werkzeug.utils import secure_filename
 from mmif.serialize import Mmif
 
-from utils import app, render_ocr, get_media, prep_annotations
+from utils import app, render_ocr, get_media, prep_annotations, prepare_ocr_visualization
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
+
+@app.route('/ocr', methods=['POST'])
+def ocr():
+    try:
+        data = dict(request.json)
+        mmif_str = open(session["mmif_file"]).read()
+        mmif = Mmif(mmif_str)
+        ocr_view = mmif.get_view_by_id(data["view_id"])
+        return prepare_ocr_visualization(mmif, ocr_view)
+    except Exception as e:
+        return f'<p class="error">{e}</h1>'
+
+
 @app.route('/ocrpage', methods=['POST'])
 def ocrpage():
     data = request.json
     try:
-        page_number = data["page_number"]
-        view_id = data["view_id"]
-        return (render_ocr(data['vid_path'], data["view_id"], page_number))
+        return (render_ocr(data['vid_path'], data["view_id"], data["page_number"]))
     except Exception as e:
         return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
-        pass
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
@@ -47,6 +59,7 @@ def upload():
             filename = secure_filename(file.filename)
             file.save(os.path.join('temp', filename))
             with open("temp/" + filename) as fh:
+                session["mmif_file"] = fh.name
                 mmif_str = fh.read()
                 return render_mmif(mmif_str)
     return render_template('upload.html')
