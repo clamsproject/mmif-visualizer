@@ -10,9 +10,10 @@
 	  href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
 	  integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
 	  crossorigin="anonymous">
-    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
-	    integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
-	    crossorigin="anonymous"></script>
+    <script
+      src="https://code.jquery.com/jquery-3.6.3.min.js"
+      integrity="sha256-pvPw+upLPUjgMXY0G+8O0xUf+/Im1MZjXxxgOcBQBXU="
+      crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
 	    integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
 	    crossorigin="anonymous"></script>
@@ -25,12 +26,20 @@
     .tab-content {
         display: inline-block;
         overflow-y: auto;
-        max-height: 100vh;
+        overflow-x: auto;
+        max-height: 80vh;
+        width: 100%
     }
     /* make video player dynamically resized */
-    video {
-        width: 100%    !important;
-        height: auto   !important;
+    #vid {
+        width: 100%;
+        height: auto;
+    }
+    .error {
+        background-color: #D72638;
+        color: #ffffff;
+        padding: 10px;
+        border-radius: 5px;
     }
 </style>
 
@@ -54,7 +63,7 @@
             <a class="nav-link active" data-toggle="tab" href="#{{ media[0][0] }}">{{ media[0][0] }}</a>
           </li>
           {% for medium in media[1:] %}
-          <li class="nav-item">
+          <li class="nav-item {{medium[0]}}">
             <a class="nav-link" data-toggle="tab" href="#{{ medium[0] }}">{{ medium[0] }}</a>
           </li>
           {%  endfor %}
@@ -79,10 +88,10 @@
 
       <div class="col-lg-8">
 
-        <!-- navigation tabs for the visualizations (WEBVTT, Entities, etcetera) -->
+        <!-- navigation tabs for the visualizations (WebVTT, Entities, etcetera) -->
         <ul class="nav nav-tabs">
           {% for annotation in annotations %}
-          <li class="nav-item">
+          <li class="nav-item {{ annotation[0] }}">
             <a class="nav-link" data-toggle="tab" href="#{{ annotation[0] }}">{{ annotation[0] }}</a>
           </li>
           {%  endfor %}

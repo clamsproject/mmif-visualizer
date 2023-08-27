@@ -64,7 +64,7 @@ First install the python dependencies listed in `requirements.txt`:
 $ pip install -r requirements.txt
 ````
 
-Let's again assume that the data are in a local directory `/Users/Shared/archive` with sub directories `audio`, `image`, `text` and`video`. You need to copy, symlink, or mount that local directory into the `static` directory. Note that the `static/data` symbolic link that is in the repository is set up to work with the docker containers, if you keep it in that form your data need to be in `/data`, otherwise you need to chamge the link to fit your needs, for example, you could remove the symbolic link and replace it with one that uses your local directory:
+Let's again assume that the data are in a local directory `/Users/Shared/archive` with sub directories `audio`, `image`, `text` and`video`. You need to copy, symlink, or mount that local directory into the `static` directory. Note that the `static/data` symbolic link that is in the repository is set up to work with the docker containers, if you keep it in that form your data need to be in `/data`, otherwise you need to change the link to fit your needs, for example, you could remove the symbolic link and replace it with one that uses your local directory:
 
 ```bash
 $ rm static/data
@@ -97,7 +97,7 @@ According to the MMIF file, those three files should be found in their respectiv
 - If you run the visualizer in a Docker container, then the `-v` option in the docker-run command is used to mount the local data directory `/Users/shared/archive` to the `/data` directory on the container and the `static/data` symlink already points to that.
 - If you run the visualizer on your local machine without using a container, then you have a couple of options (where you may need to remove the current link first):
   - Make sure that the `static/data` symlink points at the local data directory 
-    `$> ln -s /Users/Shared/archive/ static/data`
+    `$ ln -s /Users/Shared/archive/ static/data`
   - Copy the contents of `/Users/Shared/archive` into `static/data`.
   - You could choose to copy the data to any spot in the `static` folder but then you would have to edit the MMIF input file.
 
