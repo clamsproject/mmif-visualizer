@@ -4,11 +4,13 @@ import shutil
 import threading
 import pathlib
 
+from utils import app
+
 lock = threading.Lock()
 
 
 def get_cache_path():
-    return pathlib.Path(__file__).parent.parent / "static" / "tmp"
+    return pathlib.Path(app.root_path) / "static" / "tmp"
 
 
 def set_last_access(path):

@@ -1,16 +1,17 @@
 import os
-import pathlib
-import sys
 import secrets
-import shortuuid
+import sys
+from pathlib import Path
 from threading import Thread
 
-from flask import request, render_template, flash, redirect, send_from_directory, session, redirect
-from werkzeug.utils import secure_filename
+import shortuuid
+from flask import request, render_template, flash, send_from_directory, session, redirect
 from mmif.serialize import Mmif
 
-from utils import app, render_ocr, get_media, prep_annotations, prepare_ocr_visualization
+import cache
 from cache import set_last_access, cleanup
+from utils import app, render_ocr, get_media, prep_annotations, prepare_ocr_visualization
+
 
 @app.route('/')
 def index():
@@ -21,7 +22,7 @@ def index():
 def ocr():
     try:
         data = dict(request.json)
-        mmif_str = open(os.path.join("/app/static/tmp", data["mmif_id"], "file.mmif")).read()
+        mmif_str = open(cache.get_cache_path() / data["mmif_id"] / "file.mmif").read()
         mmif = Mmif(mmif_str)
         ocr_view = mmif.get_view_by_id(data["view_id"])
         return prepare_ocr_visualization(mmif, ocr_view, data["mmif_id"])
@@ -33,9 +34,10 @@ def ocr():
 def ocrpage():
     data = request.json
     try:
-        return (render_ocr(data["mmif_id"], data['vid_path'], data["view_id"], data["page_number"]))
+        return render_ocr(data["mmif_id"], data['vid_path'], data["view_id"], data["page_number"])
     except Exception as e:
         return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
+
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
@@ -58,13 +60,14 @@ def upload():
             return redirect(request.url)
         if file:
             return upload_file(file)
-        
+
     return render_template('upload.html')
 
-@app.route('/display/<id>')
-def display(id):
+
+@app.route('/display/<viz_id>')
+def display(viz_id):
     try:
-        path = os.path.join("/app/static/tmp", id)
+        path = cache.get_cache_path() / viz_id
         set_last_access(path)
         with open(os.path.join(path, "index.html")) as f:
             html_file = f.read()
@@ -73,9 +76,11 @@ def display(id):
         flash("File not found -- please upload again (it may have been deleted to clear up cache space).")
         return redirect("/upload")
 
+
 @app.route('/uv/<path:path>')
 def send_js(path):
     return send_from_directory("uv", path)
+
 
 def render_mmif(mmif_str):
     mmif = Mmif(mmif_str)
@@ -84,11 +89,13 @@ def render_mmif(mmif_str):
     return render_template('player.html',
                            media=media, annotations=annotations)
 
+
 def upload_file(file):
     # Save file locally
-    id = shortuuid.uuid()
-    session["mmif_id"] = id
-    path = os.path.join("/app/static/tmp", id)
+    uuid = shortuuid.uuid()
+    session["mmif_id"] = uuid
+    app.logger.debug(uuid)
+    path = Path(app.root_path) / 'static' / 'tmp' / uuid
     os.makedirs(path)
     set_last_access(path)
     file.save(os.path.join(path, "file.mmif"))
@@ -105,16 +112,15 @@ def upload_file(file):
 
     agent = request.headers.get('User-Agent')
     if 'curl' in agent.lower():
-        return f"Document ID is {id}\nYou can access the visualized file at /display/{id}\n"
-    return redirect(f"/display/{id}", code=302)
+        return f"Visualization ID is {uuid}\nYou can access the visualized file at /display/{uuid}\n"
+    return redirect(f"/display/{uuid}", code=301)
 
 
 if __name__ == '__main__':
     # Make path for temp files
-    tmp_path = pathlib.Path(__file__).parent /'static'/'tmp'
-    if not os.path.exists(tmp_path):
-        os.makedirs(tmp_path)
-
+    cache_path = cache.get_cache_path()
+    if not os.path.exists(cache_path):
+        os.makedirs(cache_path)
 
     # to avoid runtime errors for missing keys when using flash()
     alphabet = 'abcdefghijklmnopqrstuvwxyz1234567890'
