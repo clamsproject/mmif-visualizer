@@ -46,11 +46,13 @@ def asr_alignments_to_vtt(alignment_view, viz_id):
             start, end, text = start_end_text
             start_kwarg, end_kwarg = {timeunit: float(start)}, {timeunit: float(end)}
             start, end = timedelta(**start_kwarg), timedelta(**end_kwarg)
+            s_mins, s_secs = divmod(start.seconds, 60)
+            e_mins, e_secs = divmod(end.seconds, 60)
             if not vtt_start:
-                vtt_start = f'{start.seconds // 3600 :02d}:{start.seconds:02d}.{start.microseconds // 1000 :03d}'
+                vtt_start = f'{s_mins:02d}:{s_secs:02d}.{((s_secs - int(s_secs)) * 1000):03d}'
             texts.append(text)
             if len(texts) > 8:
-                vtt_end = f'{end.seconds // 3600 :02d}:{end.seconds:02d}.{end.microseconds // 1000 :03d}'
+                vtt_end = f'{e_mins:02d}:{e_secs:02d}.{((e_secs - int(e_secs)) * 1000):03d}'
                 vtt_file.write(f'{vtt_start} --> {vtt_end}\n{" ".join(texts)}\n\n')
                 vtt_start = None
                 texts = []
