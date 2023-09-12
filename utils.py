@@ -91,7 +91,7 @@ def documents_to_htmls(mmif, viz_id):
         elif document.at_type == DocumentTypes.ImageDocument:
             boxes = get_boxes(mmif)
             html = html_img(doc_path, boxes)
-        media.append((document.at_type, document.id, doc_path, html))
+        media.append((document.at_type.shortname, document.id, doc_path, html))
     manifest_filename = generate_iiif_manifest(mmif, viz_id)
     man = os.path.basename(manifest_filename)
     temp = render_template("uv_player.html", manifest=man, mmif_id=viz_id)
