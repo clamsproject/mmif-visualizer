@@ -1,23 +1,16 @@
-import os
-import cv2
-from io import StringIO, BytesIO
-# from string import Template
 from collections import Counter
+from datetime import timedelta
+from io import StringIO
 
-import displacy
-import tempfile
-
-from flask import Flask, render_template
-from werkzeug.utils import secure_filename
-
-from mmif.serialize import Mmif, View
+from flask import Flask
+from lapps.discriminators import Uri
+from mmif import DocumentTypes
 from mmif.serialize.annotation import Text
 from mmif.vocabulary import AnnotationTypes
-from lapps.discriminators import Uri
+
+import displacy
 from iiif_utils import generate_iiif_manifest
 from ocr import *
-from datetime import timedelta
-
 
 # Get Properties from MMIF file ---
 
@@ -25,16 +18,20 @@ from datetime import timedelta
 app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = 'your_secret_key_here'
 
-def get_alignments(alignment_view):
-    vtt_file = tempfile.NamedTemporaryFile('w', dir="static/", suffix='.vtt', delete=False)
+
+def asr_alignments_to_vtt(alignment_view, viz_id):
+    vtt_filename = cache.get_cache_path() / viz_id / f"{alignment_view.id.replace(':', '-')}.vtt" 
+    if vtt_filename.exists():
+        return str(vtt_filename)
+    vtt_file = open(vtt_filename, 'w')
     vtt_file.write("WEBVTT\n\n")
     annotations = alignment_view.annotations
-    timeframe_at_type = [at_type for at_type in alignment_view.metadata.contains if at_type.shortname == "TimeFrame" ][0]
+    timeframe_at_type = [at_type for at_type in alignment_view.metadata.contains if at_type.shortname == "TimeFrame"][0]
     timeunit = alignment_view.metadata.contains[timeframe_at_type]["timeUnit"]
     # TODO: wanted to use "mmif.get_alignments(AnnotationTypes.TimeFrame, Uri.TOKEN)"
     # but that gave errors so I gave up on it
-    token_idx = {a.id:a for a in annotations if a.at_type.shortname == "Token"}
-    timeframe_idx = {a.id:a for a in annotations if a.at_type.shortname == "TimeFrame"}
+    token_idx = {a.id: a for a in annotations if a.at_type.shortname == "Token"}
+    timeframe_idx = {a.id: a for a in annotations if a.at_type.shortname == "TimeFrame"}
     alignments = [a for a in annotations if a.at_type.shortname == "Alignment"]
     vtt_start = None
     texts = []
@@ -49,15 +46,18 @@ def get_alignments(alignment_view):
             start, end, text = start_end_text
             start_kwarg, end_kwarg = {timeunit: float(start)}, {timeunit: float(end)}
             start, end = timedelta(**start_kwarg), timedelta(**end_kwarg)
+            s_mins, s_secs = divmod(start.seconds, 60)
+            e_mins, e_secs = divmod(end.seconds, 60)
             if not vtt_start:
-                vtt_start = f'{start.seconds // 3600 :02d}:{start.seconds:02d}.{start.microseconds // 1000 :03d}'
+                vtt_start = f'{s_mins:02d}:{s_secs:02d}.{((s_secs - int(s_secs)) * 1000):03d}'
             texts.append(text)
             if len(texts) > 8:
-                vtt_end = f'{end.seconds // 3600 :02d}:{end.seconds:02d}.{end.microseconds // 1000 :03d}'
+                vtt_end = f'{e_mins:02d}:{e_secs:02d}.{((e_secs - int(e_secs)) * 1000):03d}'
                 vtt_file.write(f'{vtt_start} --> {vtt_end}\n{" ".join(texts)}\n\n')
                 vtt_start = None
                 texts = []
-    return vtt_file
+    return vtt_file.name
+
 
 def build_alignment(alignment, token_idx, timeframe_idx):
     target = alignment.properties['target']
@@ -70,31 +70,31 @@ def build_alignment(alignment, token_idx, timeframe_idx):
         text = token.properties['word']
         return start, end, text
 
-def get_media(mmif):
+
+def documents_to_htmls(mmif, viz_id):
     # Returns a list of tuples, one for each element in the documents list of
     # the MMIF object, following the order in that list. Each tuple has four
     # elements: document type, document identifier, document path and the HTML
     # visualization.
     media = []
     for document in mmif.documents:
-        doc_type = get_document_type_short_form(document)
-        doc_path = document.location
-        print('>>>', doc_path)
-        if doc_type == 'Text':
+        doc_path = document.location_path()
+        app.logger.debug(f"MMIF on AV asset: {doc_path}")
+        if document.at_type == DocumentTypes.TextDocument:
             html = html_text(doc_path)
-        elif doc_type == 'Video':
+        elif document.at_type == DocumentTypes.VideoDocument:
             fa_views = get_alignment_views(mmif)
             fa_view = fa_views[0] if fa_views else None
-            html = html_video(doc_path, fa_view)
-        elif doc_type == 'Audio':
+            html = html_video(viz_id, doc_path, fa_view)
+        elif document.at_type == DocumentTypes.AudioDocument:
             html = html_audio(doc_path)
-        elif doc_type == 'Image':
+        elif document.at_type == DocumentTypes.ImageDocument:
             boxes = get_boxes(mmif)
             html = html_img(doc_path, boxes)
-        media.append((doc_type, document.id, doc_path, html))
-    manifest_filename = generate_iiif_manifest(mmif)
+        media.append((document.at_type.shortname, document.id, doc_path, html))
+    manifest_filename = generate_iiif_manifest(mmif, viz_id)
     man = os.path.basename(manifest_filename)
-    temp = render_template("uv_player.html", manifest=man)
+    temp = render_template("uv_player.html", manifest=man, mmif_id=viz_id)
     media.append(('UV', "", "", temp))
     return media
 
@@ -121,25 +121,25 @@ def get_boxes(mmif):
     return boxes
 
 
-def get_document_type_short_form(document):
-    """Returns 'Video', 'Text', 'Audio' or 'Image' from the document type of
-    the document."""
-    document_type = document.at_type.shortname
-    return document_type[:-8]
-
-def prep_annotations(mmif):
+def prep_annotations(mmif, viz_id):
     """Prepare annotations from the views, and return a list of pairs of tabname
     and tab content. The first tab is alway the full MMIF pretty print."""
-    tabs = [("Info", "<pre>" + create_info(mmif) + "</pre>"),
-            ("MMIF", "<pre>" + mmif.serialize(pretty=True) + "</pre>"),
-            ("Annotations", create_annotation_tables(mmif)),
-            ("Tree", render_interactive_mmif(mmif))]
+    tabs = []
+    tabs.append(("Info", "<pre>" + create_info(mmif) + "</pre>"))
+    app.logger.debug(f"Prepared INFO Tab: {tabs[-1][0]}")
+    # tabs.append(("MMIF", "<pre>" + mmif.serialize(pretty=True) + "</pre>"))
+    # app.logger.debug(f"Prepared RAW Tab: {tabs[-1][0]}")
+    tabs.append(("Annotations", create_annotation_tables(mmif)))
+    app.logger.debug(f"Prepared SUMMARY Tab: {tabs[-1][0]}")
+    tabs.append(("Tree", render_interactive_mmif(mmif)))
+    app.logger.debug(f"Prepared JSTREE Tab: {tabs[-1][0]}")
     # TODO: since this uses the same tab-name this will only show the same
     # stuff; it does a loop but for now we assume there is just one file with
     # alignments (generated by Kaldi)
     for fa_view in get_alignment_views(mmif):
-        vtt_file = view_to_vtt(fa_view)
+        vtt_file = asr_alignments_to_vtt(fa_view, viz_id)
         tabs.append(("WebVTT", '<pre>' + open(vtt_file).read() + '</pre>'))
+        app.logger.debug(f"Prepared a VTT Tab: {tabs[-1][0]}")
     ner_views = get_ner_views(mmif)
     use_id = True if len(ner_views) > 1 else False
     for ner_view in ner_views:
@@ -148,25 +148,18 @@ def prep_annotations(mmif):
         visualization = create_ner_visualization(mmif, ner_view)
         tabname = "Entities-%s" % ner_view.id if use_id else "Entities"
         tabs.append((tabname, visualization))
+        app.logger.debug(f"Prepared a displaCy Tab: {tabs[-1][0]}")
     # TODO: somewhat hackish
     ocr_views = get_ocr_views(mmif)
     use_id = True if len(ocr_views) > 1 else False
     for ocr_view in ocr_views:
         if not ocr_view.annotations:
             continue
-        # visualization = "prepare_ocr_visualization(mmif, ocr_view)"
-        tabname = "Frames-%s" % ocr_view.id
-        visualization = render_template("pre-ocr.html", view_id=ocr_view.id, tabname=tabname)
+        tabname = "Thumbnails-%s" % ocr_view.id
+        visualization = render_template("pre-ocr.html", view_id=ocr_view.id, tabname=tabname, mmif_id=viz_id)
         tabs.append((tabname, visualization))
+        app.logger.debug(f"Prepared a Thumbnails Tab: {tabs[-1][0]}")
     return tabs
-
-
-def get_video_path(mmif):
-    media = get_media(mmif)
-    for file in media:
-        if file[0] == "Video":
-            return file[2]
-    return None    
 
 
 def create_info(mmif):
@@ -198,7 +191,7 @@ def create_annotation_tables(mmif):
                 % (view.id, view.metadata.app, status, len(view.annotations)))
         s.write("<blockquote>\n")
         s.write("<table cellspacing=0 cellpadding=5 border=1>\n")
-        limit_len = lambda str : str[:500] + "  . . .  }" if len(str) > 500 else str
+        limit_len = lambda str: str[:500] + "  . . .  }" if len(str) > 500 else str
         for annotation in view.annotations:
             s.write('  <tr>\n')
             s.write('    <td>%s</td>\n' % annotation.id)
@@ -235,38 +228,27 @@ def get_alignment_views(mmif):
     return views
 
 
-
 # Remder Media as HTML ------------
 
-def html_video(vpath, vtt_srcview=None):
+def html_video(viz_id, vpath, vtt_srcview=None):
     vpath = url2posix(vpath)
     html = StringIO()
-    html.write('<video id="vid" controls>\n')
+    html.write('<video id="vid" controls crossorigin="anonymous" >\n')
     html.write(f'    <source src=\"{vpath}\">\n')
     if vtt_srcview is not None:
-        vtt_path = view_to_vtt(vtt_srcview)
-        # use only basename because "static" directory is mapped to '' route by
-        # `static_url_path` param
-        src = os.path.basename(vtt_path)
-        html.write(f'    <track kind="subtitles" srclang="en" src="{src}" label="English" default>\n')
+        vtt_path = asr_alignments_to_vtt(vtt_srcview, viz_id)
+        src = cache.get_cache_relpath(vtt_path)
+        app.logger.debug(f"VTT path: {vtt_path}")
+        html.write(f'    <track kind="captions" srclang="en" src="{src}" label="transcript" default/>\n')
     html.write("</video>\n")
     return html.getvalue()
 
 
 def html_text(tpath):
-    """Return the conent of the text document, but with some HTML tags added."""
+    """Return the content of the text document, but with some HTML tags added."""
     if not os.path.isfile(tpath):
-        # This is to fix a problem when running this from a local machine where
-        # /data/text may not be available (it always is available from the
-        # container). The same problem occurs in displacy/__init__.py.
-        if tpath.startswith('file:///'):
-            tpath = tpath[8:]
-        else:
-            # this should not happen anymore, but keeping it anyway
-            tpath = tpath[1:]
-        tpath = os.path.join(app.root_path, 'static', tpath)
+        raise FileNotFoundError(f"File not found: {tpath}")
     with open(tpath) as t_file:
-        #return f"<pre width=\"100%\">\n{t_file.read()}\n</pre>"
         content = t_file.read().replace("\n", "<br/>\n")
         return f"{content}\n"
 
@@ -274,7 +256,6 @@ def html_text(tpath):
 def html_img(ipath, boxes=None, id="imgCanvas"):
     ipath = url2posix(ipath)
     boxes = [] if boxes is None else boxes
-    # t = Template(open('templates/image.html').read())
     return render_template('image.html', filename=ipath, boxes=boxes, id=id)
 
 
@@ -290,10 +271,12 @@ def url2posix(path):
         path = path[7:]
     return path
 
+
 # Interactive MMIF Tab -----------
 
 def render_interactive_mmif(mmif):
     return render_template('interactive.html', mmif=mmif, aligned_views=get_aligned_views(mmif))
+
 
 # Functions for checking if view can be rendered with alignment highlighting
 def get_aligned_views(mmif):
@@ -305,6 +288,7 @@ def get_aligned_views(mmif):
                 aligned_views.append(view.id)
     return aligned_views
 
+
 def check_view_alignment(annotations):
     anno_stack = []
     for annotation in annotations:
@@ -313,20 +297,18 @@ def check_view_alignment(annotations):
         else:
             anno_stack.append(annotation.id)
         if len(anno_stack) == 3:
-            if type(anno_stack[0]) == str or not (anno_stack[0]["source"] in anno_stack and anno_stack[0]["target"] in anno_stack):
+            if type(anno_stack[0]) == str or not (
+                    anno_stack[0]["source"] in anno_stack and anno_stack[0]["target"] in anno_stack):
                 return False
             anno_stack = []
     return True
+
 
 # NER Tools ----------------------
 
 def get_ner_views(mmif):
     return [v for v in mmif.views if Uri.NE in v.metadata.contains]
 
-def view_to_vtt(alignment_view):
-    """Write alignments to a file in VTT style and return the filename."""
-    vtt_file = get_alignments(alignment_view)
-    return os.sep.join(vtt_file.name.split(os.sep)[-2:])
 
 def create_ner_visualization(mmif, view):
     metadata = view.metadata.contains.get(Uri.NE)
@@ -337,6 +319,8 @@ def create_ner_visualization(mmif, view):
     except KeyError as e:
         # the view's entities refer to more than one text document (tessearct)
         pass
+
+
 def get_status(view):
     return 'ERROR' if 'message' in view.metadata.error else 'OKAY'
 
@@ -352,12 +336,13 @@ def get_properties(annotation):
         props_list.append("%s=%s" % (prop, val))
     return '{ %s }' % ', '.join(props_list)
 
+
 # OCR Tools ----------------------
 
-def prepare_ocr_visualization(mmif, view):
+def prepare_ocr_visualization(mmif, view, mmif_id):
     """ Visualize OCR by extracting image frames with BoundingBoxes from video"""
     # frames, text_docs, alignments = {}, {}, {}
-    vid_path = get_video_path(mmif)
+    vid_path = mmif.get_documents_by_type(DocumentTypes.VideoDocument)[0].location_path()
     cv2_vid = cv2.VideoCapture(vid_path)
     fps = cv2_vid.get(cv2.CAP_PROP_FPS)
 
@@ -368,5 +353,5 @@ def prepare_ocr_visualization(mmif, view):
     frames_list = find_duplicates(frames_list, cv2_vid)
     frames_pages = paginate(frames_list)
     # Save page list as temp file
-    save_json(frames_pages, view.id)
-    return render_ocr(vid_path, view.id, 0)
+    save_json(frames_pages, view.id, mmif_id)
+    return render_ocr(mmif_id, vid_path, view.id, 0)

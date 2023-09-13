@@ -1,16 +1,17 @@
+import datetime
 import json
 import os
-import pathlib
 import tempfile
 from typing import Dict
 
 import mmif
 from flask import url_for
 from mmif import AnnotationTypes, DocumentTypes, Mmif
-import datetime
+
+import cache
 
 
-def generate_iiif_manifest(in_mmif: mmif.Mmif):
+def generate_iiif_manifest(in_mmif: mmif.Mmif, viz_id):
     iiif_json = {
         "@context": "http://iiif.io/api/presentation/2/context.json",
         "id": "http://0.0.0.0:5000/mmif_example_manifest.json",
@@ -28,7 +29,7 @@ def generate_iiif_manifest(in_mmif: mmif.Mmif):
     }
     add_canvas_from_documents(in_mmif, iiif_json)
     add_structure_from_timeframe(in_mmif, iiif_json)
-    return save_manifest(iiif_json)
+    return save_manifest(iiif_json, viz_id)
 
 
 def add_canvas_from_documents(in_mmif, iiif_json):
@@ -105,9 +106,10 @@ def add_structure_from_timeframe(in_mmif: Mmif, iiif_json: Dict):
         iiif_json["structures"].append(view_range)
 
 
-def save_manifest(iiif_json: Dict) -> str:
+def save_manifest(iiif_json: Dict, viz_id) -> str:
     # generate a iiif manifest and save output file
-    manifest = tempfile.NamedTemporaryFile('w', dir=str(pathlib.Path(__file__).parent /'static'/'tmp'), suffix='.json', delete=False)
+    manifest = tempfile.NamedTemporaryFile(
+        'w', dir=str(cache.get_cache_path() / viz_id), suffix='.json', delete=False)
     json.dump(iiif_json, manifest, indent=4)
     return manifest.name
 

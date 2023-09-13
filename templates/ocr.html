@@ -1,7 +1,7 @@
 
 <div id="ocr_tab_{{view_id}}">
     {% for frame_num, frame in page %}
-        {% set filename = frame["id"] %}
+        {% set filename = "/tmp/" + mmif_id + "/img/" + frame["id"] %}
         {% set id = frame["id"] %}
         {% set boxes = frame["boxes"] %}
         {% set secs = frame["secs"] %}
@@ -127,12 +127,13 @@ function changePage(page) {
         var data = {
             "vid_path": "{{vid_path}}",
             "view_id": "{{view_id}}",
-            "page_number": parseInt("{{page_number}}")
+            "page_number": parseInt("{{page_number}}"),
+            "mmif_id": "{{mmif_id}}"
         }
-        if (page == BACKWARD) {
+        if (page === BACKWARD) {
             data["page_number"] -= 1
         }
-        else if (page == FORWARD) {
+        else if (page === FORWARD) {
             data["page_number"] += 1
         }
         else {
