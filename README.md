@@ -47,6 +47,7 @@ For example, if your media files are stored at `/llc_data` and your MMIF files s
 ./start_visualizer.sh /llc_data /data
 ```
 
+The server can then be accessed at `http://localhost:5000/upload`
 
 ## Running the server in a container
 
