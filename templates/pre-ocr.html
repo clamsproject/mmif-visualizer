@@ -11,7 +11,8 @@
             return
         loaded_ocr_tabs += "{{tabname}}";
         var data = {
-            "view_id": "{{view_id}}"
+            "view_id": "{{view_id}}",
+            "mmif_id": "{{mmif_id}}"
         }
         $.ajax({
             type:'POST',

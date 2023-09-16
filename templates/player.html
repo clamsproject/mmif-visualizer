@@ -23,6 +23,13 @@
 </head>
 
 <style>
+    .card-header {
+      display: flex;
+      flex-direction: row;
+      width: 100%;
+      justify-content: space-between;
+    }
+
     .tab-content {
         display: inline-block;
         overflow-y: auto;
@@ -62,6 +69,16 @@
         animation: spin 2s linear infinite;
     }
 
+    .left, .right, .title {
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+
+    .title {
+      justify-content: center;
+    }
+    
     /* Safari */
     @-webkit-keyframes spin {
         0% { -webkit-transform: rotate(0deg); }
@@ -79,7 +96,16 @@
 <div class="panel panel-default">
 
   <div class="card-header">
-    <h1 align="center">Visualizing MMIF</h1>
+    <div class="left">
+      <form action="/upload">
+        <input type="submit" value="Upload another file" />
+      </form>
+      <form action="/decache?viz_id={{ viz_id }}" method="POST">
+        <input type="submit" value="Invalidate cache and regenerate visualization" />  
+      </form>
+    </div>
+    <h1 class="title">Visualizing MMIF</h1>
+    <div class="right"></div>
   </div>
 
   <div class="card-body container-fluid">

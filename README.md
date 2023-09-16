@@ -47,7 +47,7 @@ In these notes we assume that the data are in a local directory named `/Users/Sh
 $ docker run --rm -d -p 5000:5000 -v /Users/Shared/archive:/data clams-mmif-visualizer
 ```
 
-After this, all you need to do is point your browser at [http://0.0.0.0:5000/upload](http://0.0.0.0:5000/upload), click "Choose File", select a MMIF file and then click "Visualize". See the *Data source repository and input MMIF file* section below for a description of the MMIF file. Assuming you have not made any changes to the directory structure you can use the example MMIF files in the `input` folder.
+See the *Data source repository and input MMIF file* section below for a description of the MMIF file. Assuming you have not made any changes to the directory structure you can use the example MMIF files in the `input` folder.
 
 **Some background**
 
@@ -89,8 +89,17 @@ To run the server do:
 $ python app.py
 ```
 
-Then point your browser at [http://0.0.0.0:5000/upload](http://0.0.0.0:5000/upload), click "Choose File" and then click "Visualize".
 
+## Uploading Files
+MMIF files can be uploaded to the visualization server one of two ways:
+* Point your browser to http://0.0.0.0:5000/upload, click "Choose File" and then click "Visualize". This will generate a static URL containing the visualization of the input file (e.g. `http://localhost:5000/display/HaTxbhDfwakewakmzdXu5e`). Once the file is uploaded, the page will automatically redirect to the file's visualization.
+* Using a command line, enter:
+  ``` 
+  curl -X POST -F "file=@<filename>" -s http://localhost:5000/upload
+  ```
+  This will upload the file and print the unique identifier for the file visualization. The visualization can be accessed at `http://localhost:5000/display/<id>`
+
+The server will maintain a cache of up to 50MB for these temporary files, so the visualizations can be repeatedly accessed without needing to re-upload any files. Once this limit is reached, the server will delete stored visualizations until enough space is reclaimed, drawing from oldest/least recently accessed pages first. If you attempt to access the /display URL of a deleted file, you will be redirected back to the upload page instead.
 
 
 ## Data source repository and input MMIF file
