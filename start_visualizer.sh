@@ -1,5 +1,5 @@
 # Check for presence of Docker/Podman engines
-if command -v doscker &> /dev/null
+if command -v docker &> /dev/null
 then
     export container_engine=docker
 elif command -v podman &> /dev/null
@@ -28,4 +28,4 @@ fi
 # Start visualizer
 $container_engine build . -f Containerfile -t clams-mmif-visualizer
 $container_engine run -d --name clams-mmif-visualizer --rm -p 5000:5000 -e PYTHONUNBUFFERED=1 -v $datadir:$mountdir -v $datadir:/app/static/$mountdir clams-mmif-visualizer
-echo "MMIF Visualizer is running in the background and can be accessed at http://localhost:5000/. To shut down, run '$container_engine kill clams-mmif-visualizer'"
+echo "MMIF Visualizer is running in the background and can be accessed at http://localhost:5000/. To shut it down, run '$container_engine kill clams-mmif-visualizer'"
