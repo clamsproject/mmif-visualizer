@@ -31,6 +31,21 @@ To get this code if you don't already have it:
 $ git clone https://github.com/clamsproject/mmif-visualizer
 ```
 
+## Quick start
+
+If you just want to get the server up and running quickly, the repository contains a shell script `start_visualizer.sh` to immediately launch the visualizer in a container. You can invoke it with the following command:
+
+```
+./start_visualizer.sh <data_directory> <mount_directory>
+```
+
+* The **required**  `data_directory` argument should be the absolute or relative path of the media files on your machine which the MMIF files reference.
+* The **optional** `mount_directory` argument should be specified if your MMIF files point to a different directory than where your media files are stored on the host machine. For example, if your video, audio, and text data is stored locally at `/home/archive` but your MMIF files refer to `/data/...`, you should set this variable to `/data`. (If this variable is not set, the mount directory will default to the data directory)
+
+For example, if your media files are stored at `/llc_data` and your MMIF files specify the document location as `"location": "file:///data/...`, you can start the visualizer with the following command: 
+```
+./start_visualizer.sh /llc_data /data
+```
 
 
 ## Running the server in a container
