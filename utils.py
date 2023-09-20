@@ -6,7 +6,7 @@ from flask import Flask
 from lapps.discriminators import Uri
 from mmif import DocumentTypes
 from mmif.serialize.annotation import Text
-from mmif.vocabulary import AnnotationTypes
+from mmif.vocabulary import AnnotationTypes, DocumentTypes
 
 import displacy
 from iiif_utils import generate_iiif_manifest
@@ -58,6 +58,11 @@ def asr_alignments_to_vtt(alignment_view, viz_id):
                 texts = []
     return vtt_file.name
 
+def get_asr_text(view):
+    for annotation in view.annotations:
+        if annotation.at_type == DocumentTypes.TextDocument:
+            return annotation.get("text").value
+
 
 def build_alignment(alignment, token_idx, timeframe_idx):
     target = alignment.properties['target']
@@ -96,6 +101,8 @@ def documents_to_htmls(mmif, viz_id):
     man = os.path.basename(manifest_filename)
     temp = render_template("uv_player.html", manifest=man, mmif_id=viz_id)
     media.append(('UV', "", "", temp))
+    add_document = render_template("add_document.html")
+    media.append(('Gold', "", "", add_document))
     return media
 
 
@@ -139,6 +146,8 @@ def prep_annotations(mmif, viz_id):
     for fa_view in get_alignment_views(mmif):
         vtt_file = asr_alignments_to_vtt(fa_view, viz_id)
         tabs.append(("WebVTT", '<pre>' + open(vtt_file).read() + '</pre>'))
+        transcript = get_asr_text(fa_view)
+        tabs.append(("ASR", transcript))
         app.logger.debug(f"Prepared a VTT Tab: {tabs[-1][0]}")
     ner_views = get_ner_views(mmif)
     use_id = True if len(ner_views) > 1 else False

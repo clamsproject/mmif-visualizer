@@ -1,0 +1,111 @@
+<p>Upload gold file for comparison and select tab to compare</p>
+<input type="file" id="fileInput">
+<select name="asrtabs" id="asrtabs">
+</select>
+<div id="goldtext"></div>
+<!-- TODO: Determine values -->
+<!-- <select name="tab" id="tab">
+    <option value="asr">ASR</option>
+</select> -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.js"></script>
+
+<script>
+
+let asrText = null;
+let compareTab = null;
+let goldText = null;
+let lastHTML = null;
+
+window.onload = function() {
+    display = document.getElementById('goldtext'),
+    dropdown = document.getElementById("asrtabs");
+
+    // Update selections
+    tabs = document.getElementsByClassName("tab-content")[1];
+    for (const child of tabs.children) {
+        let childHTML = child.innerHTML.replace("<br>", "").replace(/\s/g, '');
+        let childText = child.innerText.replace(/\s/g, '');
+        if (childHTML == childText) {
+            const newOption = document.createElement("option");
+            newOption.setAttribute("value", child.id);
+            newOption.setAttribute("data-tab", child.id);
+            newOption.innerText = child.id;
+            dropdown.appendChild(newOption);
+            if (!compareTab) {
+                compareTab = child.id;
+                updateASRText();
+            }
+        }
+    };
+
+    // Update Gold text on file upload
+    document.getElementById('fileInput').addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                goldText = e.target.result;
+                if (goldText) {
+                    getDiff();
+                }
+            }
+            reader.readAsText(file);
+        } 
+        
+    });
+
+    // Update ASR text on dropdown selection
+    $(function() {
+        $("#asrtabs").on("change", function() {
+            if (lastHTML) {
+                document.getElementById(compareTab).innerHTML = lastHTML;
+            }
+            compareTab = $(this).find('option:selected').data('tab');
+            updateASRText();
+            getDiff();
+        })
+    })
+
+}
+
+function updateASRText() {
+    asr = document.getElementById(compareTab);
+        if (asr) {
+            asrText = asr.innerText;
+        }
+}
+
+function getDiff() {
+    display.innerHTML = '';
+    goldFragment = document.createDocumentFragment();
+    asrFragment = document.createDocumentFragment();
+    
+    const diff = Diff.diffWords(goldText, asrText);
+    diff.forEach((part) => {
+        const inGold = !part.added;
+        const inASR = !part.removed;
+        const goldColor = part.removed ? 'red' : 'gray';
+        const asrColor = part.added ? 'red' : 'gray';
+
+        if (inGold) {
+            span = document.createElement('span');
+            span.style.color = goldColor;
+            span.appendChild(document
+                .createTextNode(part.value));
+            goldFragment.appendChild(span);
+        }
+        if (inASR) {
+            span = document.createElement('span');
+            span.style.color = asrColor;
+            span.appendChild(document
+                .createTextNode(part.value));
+            asrFragment.appendChild(span);
+        }
+    });
+    display.appendChild(goldFragment);
+    lastHTML = document.getElementById(compareTab).innerHTML;
+    document.getElementById(compareTab).replaceChildren(asrFragment);
+}
+
+</script>
