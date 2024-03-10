@@ -130,7 +130,7 @@ def upload_file(in_mmif):
 
     agent = request.headers.get('User-Agent')
     if 'curl' in agent.lower():
-        return f"Visualization ID is {viz_id}\nYou can access the visualized file at /display/{viz_id}\n"
+        return f"Visualization ID is {viz_id}\nYou can access the visualized file at {request.url_root}display/{viz_id}\n"
     return redirect(f"/display/{viz_id}", code=301)
 
 
