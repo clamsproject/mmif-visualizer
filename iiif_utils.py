@@ -84,13 +84,14 @@ def add_canvas_from_documents(in_mmif, iiif_json):
         iiif_json["sequences"][0]["canvases"].append(canvas)
         break # todo currently only supports single document, needs more work to align canvas values
 
+
 def build_document_url(document):
-    '''
+    """
     This trims off all of the path to the document except the filename then prepends data/video/. This is so
     mmif's from running locally can still be found if the viewe
     r is run in docker, assuming the volume mount or
     symlink is correctly set.
-    '''
+    """
     location = document.location
     if location.startswith("file://"):
         location = document.location[7:]

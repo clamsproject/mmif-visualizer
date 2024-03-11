@@ -72,11 +72,13 @@ def build_alignment(alignment, token_idx, timeframe_idx):
 
 
 def documents_to_htmls(mmif, viz_id):
-    # Returns a list of tuples, one for each element in the documents list of
-    # the MMIF object, following the order in that list. Each tuple has four
-    # elements: document type, document identifier, document path and the HTML
-    # visualization.
-    media = []
+    """
+    Returns a list of tuples, one for each element in the documents list of
+    the MMIF object, following the order in that list. Each tuple has four
+    elements: document type, document identifier, document path and the HTML
+    visualization.
+    """
+    htmlized = []
     for document in mmif.documents:
         doc_path = document.location_path()
         app.logger.debug(f"MMIF on AV asset: {doc_path}")
@@ -91,12 +93,12 @@ def documents_to_htmls(mmif, viz_id):
         elif document.at_type == DocumentTypes.ImageDocument:
             boxes = get_boxes(mmif)
             html = html_img(doc_path, boxes)
-        media.append((document.at_type.shortname, document.id, doc_path, html))
+        htmlized.append((document.at_type.shortname, document.id, doc_path, html))
     manifest_filename = generate_iiif_manifest(mmif, viz_id)
     man = os.path.basename(manifest_filename)
     temp = render_template("uv_player.html", manifest=man, mmif_id=viz_id)
-    media.append(('UV', "", "", temp))
-    return media
+    htmlized.append(('UV', "", "", temp))
+    return htmlized
 
 
 def get_boxes(mmif):
@@ -228,7 +230,7 @@ def get_alignment_views(mmif):
     return views
 
 
-# Remder Media as HTML ------------
+# Render documents as HTML ------------
 
 def html_video(viz_id, vpath, vtt_srcview=None):
     vpath = url2posix(vpath)

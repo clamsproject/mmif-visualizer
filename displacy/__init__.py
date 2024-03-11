@@ -1,15 +1,8 @@
 import os
 
-from spacy import displacy
-
-from mmif.serialize import Mmif, View, Annotation
-from mmif.vocabulary import AnnotationTypes
-from mmif.vocabulary import DocumentTypes
 from lapps.discriminators import Uri
-
-
-def get_displacy(mmif: Mmif):
-    return displacy_dict_to_ent_html(mmif_to_displacy_dict(mmif))
+from mmif.serialize import Mmif, View, Annotation
+from spacy import displacy
 
 
 def visualize_ner(mmif: Mmif, view: View, document_id: str, app_root: str) -> str:

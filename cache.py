@@ -4,27 +4,25 @@ import shutil
 import threading
 import pathlib
 
-from utils import app
+from utils import app as utils_app
 
 lock = threading.Lock()
 
 
 def get_cache_path():
-    return pathlib.Path(app.static_folder) / "tmp"
+    return pathlib.Path(utils_app.static_folder) / "tmp"
 
 
 def get_cache_relpath(full_path):
-    return str(full_path)[len(app.static_folder):]
+    return str(full_path)[len(utils_app.static_folder):]
 
 
 def invalidate_cache(viz_ids):
     if not viz_ids:
-        app.logger.debug("Invalidating entire cache.")
         shutil.rmtree(get_cache_path())
         os.makedirs(get_cache_path())
     else:
         for v in viz_ids:
-            app.logger.debug(f"Invalidating {v} from cache.")
             shutil.rmtree(get_cache_path() / v)
 
 

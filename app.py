@@ -67,10 +67,12 @@ def upload():
 def invalidate_cache():
     app.logger.debug(f"Request to invalidate cache on {request.args}")
     if not request.args.get('viz_id'):
+        app.logger.debug("Invalidating entire cache.")
         cache.invalidate_cache()
         return redirect("/upload")
     viz_id = request.args.get('viz_id')
     in_mmif = open(cache.get_cache_path() / viz_id / 'file.mmif', 'rb').read()
+    app.logger.debug(f"Invalidating {viz_id} from cache.")
     cache.invalidate_cache([viz_id])
     return upload_file(in_mmif)
 
@@ -95,12 +97,12 @@ def send_js(path):
 
 def render_mmif(mmif_str, viz_id):
     mmif = Mmif(mmif_str)
-    media = documents_to_htmls(mmif, viz_id)
-    app.logger.debug(f"Prepared Media: {[m[0] for m in media]}")
+    htmlized_docs = documents_to_htmls(mmif, viz_id)
+    app.logger.debug(f"Prepared document: {[d[0] for d in htmlized_docs]}")
     annotations = prep_annotations(mmif, viz_id)
     app.logger.debug(f"Prepared Annotations: {[annotation[0] for annotation in annotations]}")
     return render_template('player.html',
-                           media=media, viz_id=viz_id, annotations=annotations)
+                           docs=htmlized_docs, viz_id=viz_id, annotations=annotations)
 
 
 def upload_file(in_mmif):
