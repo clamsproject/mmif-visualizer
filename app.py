@@ -21,7 +21,7 @@ def index():
 def ocr():
     try:
         data = dict(request.json)
-        mmif_str = open(cache.get_cache_path() / data["mmif_id"] / "file.mmif").read()
+        mmif_str = open(cache.get_cache_root() / data["mmif_id"] / "file.mmif").read()
         mmif = Mmif(mmif_str)
         ocr_view = mmif.get_view_by_id(data["view_id"])
         return prepare_ocr_visualization(mmif, ocr_view, data["mmif_id"])
@@ -71,7 +71,7 @@ def invalidate_cache():
         cache.invalidate_cache()
         return redirect("/upload")
     viz_id = request.args.get('viz_id')
-    in_mmif = open(cache.get_cache_path() / viz_id / 'file.mmif', 'rb').read()
+    in_mmif = open(cache.get_cache_root() / viz_id / 'file.mmif', 'rb').read()
     app.logger.debug(f"Invalidating {viz_id} from cache.")
     cache.invalidate_cache([viz_id])
     return upload_file(in_mmif)
@@ -79,13 +79,17 @@ def invalidate_cache():
 
 @app.route('/display/<viz_id>')
 def display(viz_id):
-    try:
-        path = cache.get_cache_path() / viz_id
+    path = cache.get_cache_root() / viz_id
+    app.logger.debug(f"Displaying visualization {viz_id} from {path}")
+    if os.path.exists(path / "index.html"):
+        app.logger.debug(f"Visualization {viz_id} found in cache.")
         set_last_access(path)
         with open(os.path.join(path, "index.html")) as f:
             html_file = f.read()
         return html_file
-    except FileNotFoundError:
+    else:
+        app.logger.debug(f"Visualization {viz_id} not found in cache.")
+        os.remove(path)
         flash("File not found -- please upload again (it may have been deleted to clear up cache space).")
         return redirect("/upload")
 
@@ -111,7 +115,7 @@ def upload_file(in_mmif):
     in_mmif_str = in_mmif_bytes.decode('utf-8')
     viz_id = hashlib.sha1(in_mmif_bytes).hexdigest()
     app.logger.debug(f"Visualization ID: {viz_id}")
-    path = cache.get_cache_path() / viz_id
+    path = cache.get_cache_root() / viz_id
     app.logger.debug(f"Visualization Directory: {path}")
     try:
         os.makedirs(path)
@@ -138,9 +142,14 @@ def upload_file(in_mmif):
 
 if __name__ == '__main__':
     # Make path for temp files
-    cache_path = cache.get_cache_path()
-    if not os.path.exists(cache_path):
-        os.makedirs(cache_path)
+    cache_path = cache.get_cache_root()
+    cache_symlink_path = os.path.join(app.static_folder, cache._CACHE_DIR_SUFFIX)
+    if os.path.islink(cache_symlink_path):
+        os.unlink(cache_symlink_path)
+    elif os.path.exists(cache_symlink_path):
+        raise RuntimeError(f"Expected {cache_symlink_path} to be a symlink (for re-linking to a new cache dir, "
+                           f"but it is a real path.")
+    os.symlink(cache_path, cache_symlink_path)
 
     # to avoid runtime errors for missing keys when using flash()
     alphabet = 'abcdefghijklmnopqrstuvwxyz1234567890'
@@ -150,4 +159,4 @@ if __name__ == '__main__':
     if len(sys.argv) > 2 and sys.argv[1] == '-p':
         port = int(sys.argv[2])
         
-    app.run(port=port, host='0.0.0.0', debug=True, use_reloader=False)
+    app.run(port=port, host='0.0.0.0', debug=True, use_reloader=True)

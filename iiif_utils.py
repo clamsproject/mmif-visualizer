@@ -110,7 +110,7 @@ def add_structure_from_timeframe(in_mmif: Mmif, iiif_json: Dict):
 def save_manifest(iiif_json: Dict, viz_id) -> str:
     # generate a iiif manifest and save output file
     manifest = tempfile.NamedTemporaryFile(
-        'w', dir=str(cache.get_cache_path() / viz_id), suffix='.json', delete=False)
+        'w', dir=str(cache.get_cache_root() / viz_id), suffix='.json', delete=False)
     json.dump(iiif_json, manifest, indent=4)
     return manifest.name
 
