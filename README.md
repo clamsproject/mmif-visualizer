@@ -7,7 +7,6 @@ This application creates an HTML server that visualizes annotation components in
 - Interactive, searchable MMIF tree view with [JSTree](https://www.jstree.com/).
 - Embedded [Universal Viewer](https://universalviewer.io/) (assuming file refers to video and/or image document).
 
-
 The application also includes tailored visualizations depending on the annotations present in the input MMIF:
 | Visualization | Supported CLAMS apps |
 |---|---|
@@ -16,9 +15,7 @@ The application also includes tailored visualizations depending on the annotatio
 | Named entity annotations with [displaCy.](https://explosion.ai/demos/displacy-ent) | [SPACY](https://github.com/clamsproject/app-spacy-wrapper) |                                                                        |
 | Screenshots & HTML5 video navigation of TimeFrames | [Chyron text recognition](https://github.com/clamsproject/app-chyron-text-recognition), [Slate detection](https://github.com/clamsproject/app-slatedetection), [Bars detection](https://github.com/clamsproject/app-barsdetection) |
 
-
-
-Requirements:
+## Requirements:
 
 - A command line interface.
 - Git (to get the code).
@@ -31,7 +28,9 @@ To get this code if you don't already have it:
 $ git clone https://github.com/clamsproject/mmif-visualizer
 ```
 
-## Quick start
+## Startup 
+
+### Quick start
 
 If you just want to get the server up and running quickly, the repository contains a shell script `start_visualizer.sh` to immediately launch the visualizer in a container. You can invoke it with the following command:
 
@@ -42,47 +41,16 @@ If you just want to get the server up and running quickly, the repository contai
 * The **required**  `data_directory` argument should be the absolute or relative path of the media files on your machine which the MMIF files reference.
 * The **optional** `mount_directory` argument should be specified if your MMIF files point to a different directory than where your media files are stored on the host machine. For example, if your video, audio, and text data is stored locally at `/home/archive` but your MMIF files refer to `/data/...`, you should set this variable to `/data`. (If this variable is not set, the mount directory will default to the data directory)
 
-For example, if your media files are stored at `/llc_data` and your MMIF files specify the document location as `"location": "file:///data/...`, you can start the visualizer with the following command: 
+For example, if your media files are stored at `/my_data` and your MMIF files specify the document location as `"location": "file:///data/...`, you can start the visualizer with the following command: 
 ```
-./start_visualizer.sh /llc_data /data
-```
-
-The server can then be accessed at `http://localhost:5000/upload`
-
-## Running the server in a container
-
-Download or clone this repository and build an image using the `Dockerfile` (you may use another name for the -t parameter, for this example we use `clams-mmif-visualizer` throughout). **NOTE**: if using podman, just substitute `docker` for `podman` in the following commands.
-
-```bash
-$ docker build . -f Containerfile -t clams-mmif-visualizer
+./start_visualizer.sh /my_data /data
 ```
 
-In these notes we assume that the data are in a local directory named `/Users/Shared/archive` with sub directories `audio`, `image`, `text` and `video` (those subdirectories are standard in CLAMS, but the parent directory could be any directory depending on your local set up). We can now run a Docker container with
+The server can then be accessed at `http://localhost:5001/upload`
 
-```bash
-$ docker run --rm -d -p 5000:5000 -v /Users/Shared/archive:/data clams-mmif-visualizer
-```
+The following is breakdown of the script's functionality:
 
-See the *Data source repository and input MMIF file* section below for a description of the MMIF file. Assuming you have not made any changes to the directory structure you can use the example MMIF files in the `input` folder.
-
-**Some background**
-
-With the docker command above we do two things of note:
-
-1. The container port 5000 (the default for a Flask server) is exposed to the same port on your Docker host (your local computer) with the `-p` option.
-2. The local data repository `/Users/Shared/archive` is mounted to `/data` on the container with the `-v` option.
-
-Another useful piece of information is that the Flask server on the Docker container has no direct access to `/data` since it can only see data in the `static` directory of this repository. Therefore we have created a symbolic link `static/data` that links to `/data`:
-
-```bash
-$ ln -s /data static/data
-```
-
-With this, the mounted directory `/data` in the container is accessable from inside the `/app/static` directory of the container. You do not need to use this command unless you change your set up because the symbolic link is part of this repository. 
-
-
-
-## Running the server locally
+### Running the server natively
 
 First install the python dependencies listed in `requirements.txt`:
 
@@ -91,23 +59,60 @@ $ pip install -r requirements.txt
 ````
 
 You will also need to install opencv-python if you are not running within a container (`pip install opencv-python`).
-
-Let's again assume that the data are in a local directory `/Users/Shared/archive` with sub directories `audio`, `image`, `text` and`video`. You need to copy, symlink, or mount that local directory into the `static` directory. Note that the `static/data` symbolic link that is in the repository is set up to work with the docker containers, if you keep it in that form your data need to be in `/data`, otherwise you need to change the link to fit your needs, for example, you could remove the symbolic link and replace it with one that uses your local directory:
-
-```bash
-$ rm static/data
-$ ln -s /Users/Shared/archive static/data
-```
-
-To run the server do:
+Then, to run the server do:
 
 ```bash
 $ python app.py
 ```
 
+Running the server natively means that the source media file paths in the target MMIF file are all accessible in the local file system, under the same directory paths. 
+If that's not the case, and the paths in the MMIF is beyond your FS permission, using container is recommended. See the next section for an example. 
 
-## Uploading Files
-MMIF files can be uploaded to the visualization server one of two ways:
+#### Data source repository and example MMIF file
+This repository contains an example MMIF file in `example/whisper-spacy.json`. This file refers to three media files:
+
+1. service-mbrs-ntscrm-01181182.mp4
+2. service-mbrs-ntscrm-01181182.wav
+3. service-mbrs-ntscrm-01181182.txt
+ 
+> [!NOTE]
+> Note on source/copyright: these documents are sourced from [the National Screening Room collection in the Library of Congress Online Catalog](https://hdl.loc.gov/loc.mbrsmi/ntscrm.01181182). The collection provides the following copyright information:
+> > The Library of Congress is not aware of any U.S. copyright or other restrictions in the vast majority of motion pictures in these collections. Absent any such restrictions, these materials are free to use and reuse.
+
+These files can be found in the directory `example/example-documents`. But according to the `whisper-spacy.json` MMIF file, those three files should be found in their respective subdirectories in `/data`. 
+Easy way to align these paths is probably to create a symbolic link to the `example-documents` directory in the `/data` directory.
+However, since `/data` is located at the root directory, you might not have permission to write a new symlink to the FS root.
+In this case you can more easily re-map the `examples/example-documents` directory to `/data` by using the `-v` option in the docker-run command. See below. 
+
+### Running the server in a container
+
+Download or clone this repository and build an image using the `Containerfile` (you may use another name for the -t parameter,
+for this example we use `clams-mmif-visualizer` throughout).
+
+> [!NOTE]
+> if using podman, just substitute `docker` for `podman` in the following commands.
+
+```bash
+$ docker build . -f Containerfile -t clams-mmif-visualizer
+```
+
+In these notes we assume that the data are in a local directory named `/home/myuser/public` with subdirectories `audio`, `image`, `text` and `video`. We can now run a container with
+
+```bash
+$ docker run --rm -d -p 5001:5000 -v /home/myuser/public:/data clams-mmif-visualizer
+```
+
+> [!NOTE]
+> With the docker command above we do two things of note:
+> 1. The container port 5000 (the default for a Flask server) is exposed to the same port on your host (your local computer) with the `-p` option.
+> 2. The local data repository `/home/myuser/public` is mounted to `/data` on the container with the `-v` option.
+
+Now, when you use the `example/example-documents` directory as the data source to visualize `examples/whisper-spacy.json` MMIF file, you need to triple-mount the example directory to the container, as `audio`, `video`, and `text` respectively.
+
+$ docker run --rm -d -p 5001:5000 -v $(pwd)/example/example-documents:/data/audio -v $(pwd)/example/example-documents:/data/video -v $(pwd)/example/example-documents:/data/text clams-mmif-visualizer
+
+## Usage
+Use the visualizer by uploading files. MMIF files can be uploaded to the visualization server one of two ways:
 * Point your browser to http://0.0.0.0:5000/upload, click "Choose File" and then click "Visualize". This will generate a static URL containing the visualization of the input file (e.g. `http://localhost:5000/display/HaTxbhDfwakewakmzdXu5e`). Once the file is uploaded, the page will automatically redirect to the file's visualization.
 * Using a command line, enter:
   ``` 
@@ -117,31 +122,3 @@ MMIF files can be uploaded to the visualization server one of two ways:
 
 The server will maintain a cache of up to 50MB for these temporary files, so the visualizations can be repeatedly accessed without needing to re-upload any files. Once this limit is reached, the server will delete stored visualizations until enough space is reclaimed, drawing from oldest/least recently accessed pages first. If you attempt to access the /display URL of a deleted file, you will be redirected back to the upload page instead.
 
-
-## Data source repository and input MMIF file
-The data source includes video, audio, and text (transcript) files that are subjects for the CLAMS analysis tools. As mentioned above, to make this visualizer work with those files and be able to display the contents on the web browser, those source files need to be accessible from inside the `static` directory.
-
-This repository contains an example MMIF file in `input/whisper-spacy.json`. This file refers to three media files:
-
-1. service-mbrs-ntscrm-01181182.mp4
-2. service-mbrs-ntscrm-01181182.wav
-3. service-mbrs-ntscrm-01181182.txt
-
-These files can be found in the directory `input/example-documents`.  They can be moved anywhere on the host machine, as long as they are placed in the subdirectories `video`, `audio`, and `text` respectively. (e.g. `/Users/Shared/archive/video`, etc.)
-
-According to the MMIF file, those three files should be found in their respective subdirectories in `/data`. The Flask server will look for these files in `static/data/video`, `static/data/audio` and `static/data/text`, amd those directories should point at the appropriate location:
-
-- If you run the visualizer in a Docker container, then the `-v` option in the docker-run command is used to mount the local data directory `/Users/shared/archive` to the `/data` directory on the container and the `static/data` symlink already points to that.
-- If you run the visualizer on your local machine without using a container, then you have a couple of options (where you may need to remove the current link first):
-  - Make sure that the `static/data` symlink points at the local data directory 
-    `$ ln -s /Users/Shared/archive/ static/data`
-  - Copy the contents of `/Users/Shared/archive` into `static/data`.
-  - You could choose to copy the data to any spot in the `static` folder but then you would have to edit the MMIF input file.
-
-
----
-Note on source/copyright: these documents are sourced from [the National Screening Room collection in the Library of Congress Online Catalog](https://hdl.loc.gov/loc.mbrsmi/ntscrm.01181182). The collection provides the following copyright information:
-
-> The Library of Congress is not aware of any U.S. copyright or other restrictions in the vast majority of motion pictures in these collections. Absent any such restrictions, these materials are free to use and reuse.
-
----

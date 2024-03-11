@@ -71,9 +71,6 @@ gdrive_shared*/
 tags
 .tags
 
-# static archival files
-static/tmp*
-
 # VSCode
 .devcontainer
 devcontainer.json

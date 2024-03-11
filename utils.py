@@ -8,6 +8,7 @@ from mmif import DocumentTypes
 from mmif.serialize.annotation import Text
 from mmif.vocabulary import AnnotationTypes
 
+import cache
 import displacy
 from iiif_utils import generate_iiif_manifest
 from ocr import *
@@ -20,7 +21,7 @@ app.secret_key = 'your_secret_key_here'
 
 
 def asr_alignments_to_vtt(alignment_view, viz_id):
-    vtt_filename = cache.get_cache_path() / viz_id / f"{alignment_view.id.replace(':', '-')}.vtt" 
+    vtt_filename = cache.get_cache_root() / viz_id / f"{alignment_view.id.replace(':', '-')}.vtt" 
     if vtt_filename.exists():
         return str(vtt_filename)
     vtt_file = open(vtt_filename, 'w')
@@ -72,31 +73,38 @@ def build_alignment(alignment, token_idx, timeframe_idx):
 
 
 def documents_to_htmls(mmif, viz_id):
-    # Returns a list of tuples, one for each element in the documents list of
-    # the MMIF object, following the order in that list. Each tuple has four
-    # elements: document type, document identifier, document path and the HTML
-    # visualization.
-    media = []
+    """
+    Returns a list of tuples, one for each element in the documents list of
+    the MMIF object, following the order in that list. Each tuple has four
+    elements: document type, document identifier, document path and the HTML
+    visualization.
+    """
+    htmlized = []
     for document in mmif.documents:
         doc_path = document.location_path()
         app.logger.debug(f"MMIF on AV asset: {doc_path}")
+        doc_symlink_path = pathlib.Path(app.static_folder) / cache._CACHE_DIR_SUFFIX / viz_id / (f"{document.id}.{doc_path.split('.')[-1]}")
+        os.symlink(doc_path, doc_symlink_path)
+        app.logger.debug(f"{doc_path} is symlinked to {doc_symlink_path}")
+        doc_symlink_rel_path = '/' + doc_symlink_path.relative_to(app.static_folder).as_posix()
+        app.logger.debug(f"and {doc_symlink_rel_path} will be used in HTML src attribute")
         if document.at_type == DocumentTypes.TextDocument:
-            html = html_text(doc_path)
+            html = html_text(doc_symlink_rel_path)
         elif document.at_type == DocumentTypes.VideoDocument:
             fa_views = get_alignment_views(mmif)
             fa_view = fa_views[0] if fa_views else None
-            html = html_video(viz_id, doc_path, fa_view)
+            html = html_video(viz_id, doc_symlink_rel_path, fa_view)
         elif document.at_type == DocumentTypes.AudioDocument:
-            html = html_audio(doc_path)
+            html = html_audio(doc_symlink_rel_path)
         elif document.at_type == DocumentTypes.ImageDocument:
             boxes = get_boxes(mmif)
-            html = html_img(doc_path, boxes)
-        media.append((document.at_type.shortname, document.id, doc_path, html))
+            html = html_img(doc_symlink_rel_path, boxes)
+        htmlized.append((document.at_type.shortname, document.id, doc_path, html))
     manifest_filename = generate_iiif_manifest(mmif, viz_id)
     man = os.path.basename(manifest_filename)
     temp = render_template("uv_player.html", manifest=man, mmif_id=viz_id)
-    media.append(('UV', "", "", temp))
-    return media
+    htmlized.append(('UV', "", "", temp))
+    return htmlized
 
 
 def get_boxes(mmif):
@@ -228,7 +236,7 @@ def get_alignment_views(mmif):
     return views
 
 
-# Remder Media as HTML ------------
+# Render documents as HTML ------------
 
 def html_video(viz_id, vpath, vtt_srcview=None):
     vpath = url2posix(vpath)
@@ -237,9 +245,9 @@ def html_video(viz_id, vpath, vtt_srcview=None):
     html.write(f'    <source src=\"{vpath}\">\n')
     if vtt_srcview is not None:
         vtt_path = asr_alignments_to_vtt(vtt_srcview, viz_id)
-        src = cache.get_cache_relpath(vtt_path)
+        rel_vtt_path = str(vtt_path)[len(app.static_folder):]
         app.logger.debug(f"VTT path: {vtt_path}")
-        html.write(f'    <track kind="captions" srclang="en" src="{src}" label="transcript" default/>\n')
+        html.write(f'    <track kind="captions" srclang="en" src="{rel_vtt_path}" label="transcript" default/>\n')
     html.write("</video>\n")
     return html.getvalue()
 

@@ -84,13 +84,14 @@ def add_canvas_from_documents(in_mmif, iiif_json):
         iiif_json["sequences"][0]["canvases"].append(canvas)
         break # todo currently only supports single document, needs more work to align canvas values
 
+
 def build_document_url(document):
-    '''
+    """
     This trims off all of the path to the document except the filename then prepends data/video/. This is so
     mmif's from running locally can still be found if the viewe
     r is run in docker, assuming the volume mount or
     symlink is correctly set.
-    '''
+    """
     location = document.location
     if location.startswith("file://"):
         location = document.location[7:]
@@ -109,7 +110,7 @@ def add_structure_from_timeframe(in_mmif: Mmif, iiif_json: Dict):
 def save_manifest(iiif_json: Dict, viz_id) -> str:
     # generate a iiif manifest and save output file
     manifest = tempfile.NamedTemporaryFile(
-        'w', dir=str(cache.get_cache_path() / viz_id), suffix='.json', delete=False)
+        'w', dir=str(cache.get_cache_root() / viz_id), suffix='.json', delete=False)
     json.dump(iiif_json, manifest, indent=4)
     return manifest.name
 

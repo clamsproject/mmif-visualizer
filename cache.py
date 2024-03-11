@@ -1,31 +1,28 @@
 import os
-import time
-import shutil
-import threading
 import pathlib
-
-from utils import app
+import shutil
+import tempfile
+import threading
+import time
 
 lock = threading.Lock()
 
+# module constants are unchanged throughout multiple "imports"
+_CACHE_DIR_SUFFIX = "mmif-viz-cache"
+_CACHE_DIR_ROOT = tempfile.TemporaryDirectory(suffix=_CACHE_DIR_SUFFIX)
 
-def get_cache_path():
-    return pathlib.Path(app.static_folder) / "tmp"
 
-
-def get_cache_relpath(full_path):
-    return str(full_path)[len(app.static_folder):]
+def get_cache_root():
+    return pathlib.Path(_CACHE_DIR_ROOT.name)
 
 
 def invalidate_cache(viz_ids):
     if not viz_ids:
-        app.logger.debug("Invalidating entire cache.")
-        shutil.rmtree(get_cache_path())
-        os.makedirs(get_cache_path())
+        shutil.rmtree(get_cache_root())
+        os.makedirs(get_cache_root())
     else:
         for v in viz_ids:
-            app.logger.debug(f"Invalidating {v} from cache.")
-            shutil.rmtree(get_cache_path() / v)
+            shutil.rmtree(get_cache_root() / v)
 
 
 def set_last_access(path):
@@ -35,9 +32,9 @@ def set_last_access(path):
 
 def scan_tmp_directory():
     oldest_accessed_dir = {"dir": None, "access_time": None}
-    total_size = sum(f.stat().st_size for f in get_cache_path().glob('**/*') if f.is_file())
+    total_size = sum(f.stat().st_size for f in get_cache_root().glob('**/*') if f.is_file())
     # this will be some visualization IDs
-    for p in get_cache_path().glob('*'):
+    for p in get_cache_root().glob('*'):
         if not (p / 'last_access.txt').exists():
             oldest_accessed_dir = {"dir": p, "access_time": 0}
         elif oldest_accessed_dir["dir"] is None:
