@@ -35,11 +35,15 @@ class OCRFrame():
         self.update(anno, mmif)
 
     def update(self, anno, mmif):
+
         if anno.at_type.shortname == "BoundingBox":
             self.add_bounding_box(anno, mmif)
 
         elif anno.at_type.shortname == "TimeFrame":
             self.add_timeframe(anno, mmif)
+
+        elif anno.at_type.shortname == "TimePoint":
+            self.add_timepoint(anno, mmif)
 
         elif anno.at_type.shortname == "TextDocument":
             t = anno.properties.get("text_value") or anno.properties.get("text").value
@@ -64,13 +68,39 @@ class OCRFrame():
             self.boxtypes.append(anno.properties.get("boxType"))
 
     def add_timeframe(self, anno, mmif):
-        start, end = convert_timeframe(mmif, anno, "frames")
-        start_secs, end_secs = convert_timeframe(mmif, anno, "seconds")
+        # If annotation has multiple targets, pick the first and last as start and end
+        if "targets" in anno.properties:
+            start_id, end_id = anno.properties.get("targets")[0], anno.properties.get("targets")[-1]
+            anno_parent = mmif.get_view_by_id(anno.parent)
+            start_anno, end_anno = anno_parent.get_annotation_by_id(start_id), anno_parent.get_annotation_by_id(end_id)
+            start = convert_timepoint(mmif, start_anno, "frames")
+            end = convert_timepoint(mmif, end_anno, "frames")
+            start_secs = convert_timepoint(mmif, start_anno, "seconds")
+            end_secs = convert_timepoint(mmif, end_anno, "seconds")
+        else:
+            start, end = convert_timeframe(mmif, anno, "frames")
+            start_secs, end_secs = convert_timeframe(mmif, anno, "seconds")
         self.range = (start, end)
         self.timestamp_range = (str(datetime.timedelta(seconds=start_secs)), str(datetime.timedelta(seconds=end_secs)))
         self.sec_range = (start_secs, end_secs)
         if anno.properties.get("frameType"):
-            self.frametype = anno.properties.get("frameType")
+            self.frametype = str(anno.properties.get("frameType"))
+        elif anno.properties.get("label"):
+            self.frametype = str(anno.properties.get("label"))
+
+    def add_timepoint(self, anno, mmif):
+            parent = mmif.get_view_by_id(anno.parent)
+            other_annotations = [k for k in parent.metadata.contains.keys() if k != anno.id]
+            # If there are TimeFrames in the same view, they most likely represent
+            # condensed information about representative frames (e.g. SWT). In this 
+            # case, only render the TimeFrames and ignore the TimePoints.
+            if any([anno.shortname == "TimeFrame" for anno in other_annotations]):
+                return
+            self.frame_num = convert_timepoint(mmif, anno, "frames")
+            self.secs = convert_timepoint(mmif, anno, "seconds")
+            self.timestamp = str(datetime.timedelta(seconds=self.secs))
+            if anno.properties.get("label"):
+                self.frametype = anno.properties.get("label")
 
 
 def find_annotation(anno_id, view, mmif):
@@ -80,7 +110,7 @@ def find_annotation(anno_id, view, mmif):
     return view.get_annotation_by_id(anno_id)
 
 
-def get_ocr_frames(view, mmif, fps):
+def get_ocr_frames(view, mmif):
     frames = {}
     full_alignment_type = [
         at_type for at_type in view.metadata.contains if at_type.shortname == "Alignment"]
@@ -175,7 +205,7 @@ def make_image_directory(mmif_id):
     return path
 
 
-def find_duplicates(frames_list, cv2_vid):
+def find_duplicates(frames_list):
     """Find duplicate frames"""
     prev_frame = None
     for frame_num, frame in frames_list:
@@ -239,10 +269,12 @@ def round_boxes(boxes):
 def get_ocr_views(mmif):
     """Returns all CV views, which contain timeframes or bounding boxes"""
     views = []
-    required_types = ["TimeFrame", "BoundingBox"]
+    required_types = ["TimeFrame", "BoundingBox", "TimePoint"]
     for view in mmif.views:
         for anno_type, anno in view.metadata.contains.items():
             # Annotation belongs to a CV view if it is a TimeFrame/BB and it refers to a VideoDocument
+            if anno.get("document") is None:
+                continue
             if anno_type.shortname in required_types and mmif.get_document_by_id(
                     anno["document"]).at_type.shortname == "VideoDocument":
                 views.append(view)

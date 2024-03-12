@@ -351,14 +351,12 @@ def prepare_ocr_visualization(mmif, view, mmif_id):
     """ Visualize OCR by extracting image frames with BoundingBoxes from video"""
     # frames, text_docs, alignments = {}, {}, {}
     vid_path = mmif.get_documents_by_type(DocumentTypes.VideoDocument)[0].location_path()
-    cv2_vid = cv2.VideoCapture(vid_path)
-    fps = cv2_vid.get(cv2.CAP_PROP_FPS)
 
-    ocr_frames = get_ocr_frames(view, mmif, fps)
+    ocr_frames = get_ocr_frames(view, mmif)
 
     # Generate pages (necessary to reduce IO cost) and render
     frames_list = [(k, vars(v)) for k, v in ocr_frames.items()]
-    frames_list = find_duplicates(frames_list, cv2_vid)
+    frames_list = find_duplicates(frames_list)
     frames_pages = paginate(frames_list)
     # Save page list as temp file
     save_json(frames_pages, view.id, mmif_id)
