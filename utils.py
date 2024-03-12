@@ -124,10 +124,14 @@ def documents_to_htmls(mmif, viz_id):
     app.logger.debug(f"Generated IIIF manifest: {manifest_filename}")
     man = os.path.basename(manifest_filename)
     app.logger.debug(f"Manifest filename: {man}")
-    l = symlink_to_static(viz_id, manifest_filename, man)
+    symlink_to_static(viz_id, manifest_filename, man)
     app.logger.debug(f"Symlinked IIIF manifest: {None}")
     temp = render_template("uv_player.html", manifest=man, mmif_id=viz_id)
-    htmlized.append(('UV', "", "", temp))
+    # TODO (krim @ 2024-03-12): Turning off IIIF added to the HTML page since
+    # 1. current IIIF manifest conversion is based on old version of manifest API, and quite brittle
+    # 2. the conversion code at the moment can only convert TimeFrame annotation to "jump-able" IIIF canvases, 
+    # but the case is already covered by `Thumbnails` tab (look for usage of `pre-ocr.html` template)
+    # htmlized.append(('UV', "", "", temp))
     return htmlized
 
 
