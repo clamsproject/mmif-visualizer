@@ -10,6 +10,7 @@ from mmif.serialize import Mmif
 import cache
 from cache import set_last_access, cleanup
 from utils import app, render_ocr, documents_to_htmls, prep_annotations, prepare_ocr_visualization
+import traceback
 
 
 @app.route('/')
@@ -26,7 +27,8 @@ def ocr():
         ocr_view = mmif.get_view_by_id(data["view_id"])
         return prepare_ocr_visualization(mmif, ocr_view, data["mmif_id"])
     except Exception as e:
-        return f'<p class="error">{e}</h1>'
+        app.logger.error(f"{e}\n{traceback.format_exc()}")
+        return f'<p class="error">Error: {e} Check the server log for more information.</h1>'
 
 
 @app.route('/ocrpage', methods=['POST'])

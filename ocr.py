@@ -46,22 +46,34 @@ class OCRFrame():
             self.add_timepoint(anno, mmif)
 
         elif anno.at_type.shortname == "TextDocument":
-            t = anno.properties.get("text_value") or anno.properties.get("text").value
-            if t:
-                self.text.append(re.sub(r'([\\\/\|\"\'])', r'\1 ', t))
+            self.add_text_document(anno)
+
+        elif anno.at_type.shortname == "Paragraph":
+            view = mmif.get_view_by_id(anno.parent)
+            text_anno = view.get_annotation_by_id(anno.properties.get("document"))
+            self.add_text_document(text_anno)
+
 
     def add_bounding_box(self, anno, mmif):
-        self.frame_num = convert_timepoint(mmif, anno, "frames")
-        self.secs = convert_timepoint(mmif, anno, "seconds")
+        if "timePoint" in anno.properties:
+            timepoint_anno = find_annotation(anno.properties["timePoint"], mmif)
+
+            if timepoint_anno:
+                self.add_timepoint(timepoint_anno, mmif, skip_if_view_has_frames=False)
+        else:
+            self.frame_num = convert_timepoint(mmif, anno, "frames")
+            self.secs = convert_timepoint(mmif, anno, "seconds")
         box_id = anno.properties["id"]
         boxType = anno.properties["boxType"]
         coordinates = anno.properties["coordinates"]
         x = coordinates[0][0]
         y = coordinates[0][1]
-        w = coordinates[3][0] - x
-        h = coordinates[3][1] - y
+        w = coordinates[1][0] - x
+        h = coordinates[1][1] - y
         box = [box_id, boxType, [x, y, w, h]]
-        self.boxes.append(box)
+        # TODO: This is a hack to ignore percentage-based Doctr bounding boxes
+        if "doctr" not in mmif.get_view_by_id(anno.parent).metadata["app"]:
+            self.boxes.append(box)
         self.anno_ids.append(box_id)
         self.timestamp = str(datetime.timedelta(seconds=self.secs))
         if anno.properties.get("boxType") and anno.properties.get("boxType") not in self.boxtypes:
@@ -88,13 +100,13 @@ class OCRFrame():
         elif anno.properties.get("label"):
             self.frametype = str(anno.properties.get("label"))
 
-    def add_timepoint(self, anno, mmif):
+    def add_timepoint(self, anno, mmif, skip_if_view_has_frames=True):
             parent = mmif.get_view_by_id(anno.parent)
             other_annotations = [k for k in parent.metadata.contains.keys() if k != anno.id]
             # If there are TimeFrames in the same view, they most likely represent
             # condensed information about representative frames (e.g. SWT). In this 
             # case, only render the TimeFrames and ignore the TimePoints.
-            if any([anno.shortname == "TimeFrame" for anno in other_annotations]):
+            if any([anno.shortname == "TimeFrame" for anno in other_annotations]) and skip_if_view_has_frames:
                 return
             self.frame_num = convert_timepoint(mmif, anno, "frames")
             self.secs = convert_timepoint(mmif, anno, "seconds")
@@ -102,12 +114,21 @@ class OCRFrame():
             if anno.properties.get("label"):
                 self.frametype = anno.properties.get("label")
 
+    def add_text_document(self, anno):
+        t = anno.properties.get("text_value") or anno.properties.get("text").value
+        if t:
+            text_val = re.sub(r'([\\\/\|\"\'])', r'\1 ', t)
+            self.text = self.text + [text_val] if text_val not in self.text else self.text
 
-def find_annotation(anno_id, view, mmif):
+def find_annotation(anno_id, mmif):
     if mmif.id_delimiter in anno_id:
         view_id, anno_id = anno_id.split(mmif.id_delimiter)
         view = mmif.get_view_by_id(view_id)
-    return view.get_annotation_by_id(anno_id)
+    for view in mmif.views:
+        try:
+            return view.get_annotation_by_id(anno_id)
+        except KeyError:
+            continue
 
 
 def get_ocr_frames(view, mmif):
@@ -117,17 +138,22 @@ def get_ocr_frames(view, mmif):
     # If view contains alignments
     if full_alignment_type:
         for alignment in view.get_annotations(full_alignment_type[0]):
-            source = find_annotation(alignment.properties["source"], view, mmif)
-            target = find_annotation(alignment.properties["target"], view, mmif)
+            source = find_annotation(alignment.properties["source"], mmif)
+            target = find_annotation(alignment.properties["target"], mmif)
 
+            # Account for alignment in either direction
             frame = OCRFrame(source, mmif)
+            frame.update(target, mmif)
+
             i = frame.frame_num if frame.frame_num is not None else frame.range
+            if i is None:
+                continue
             if i in frames.keys():
                 frames[i].update(source, mmif)
                 frames[i].update(target, mmif)
             else:
-                frame.update(target, mmif)
                 frames[i] = frame
+            
     else:
         for annotation in view.get_annotations():
             frame = OCRFrame(annotation, mmif)
@@ -138,6 +164,7 @@ def get_ocr_frames(view, mmif):
                 frames[i].update(annotation, mmif)
             else:
                 frames[i] = frame
+    print(frames)
     return frames
 
 
@@ -273,16 +300,19 @@ def get_ocr_views(mmif):
     for view in mmif.views:
         for anno_type, anno in view.metadata.contains.items():
             # Annotation belongs to a CV view if it is a TimeFrame/BB and it refers to a VideoDocument
-            if anno.get("document") is None:
-                continue
-            if anno_type.shortname in required_types and mmif.get_document_by_id(
-                    anno["document"]).at_type.shortname == "VideoDocument":
+            # if anno.get("document") is None:
+            #     continue
+            # if anno_type.shortname in required_types and mmif.get_document_by_id(
+            #         anno["document"]).at_type.shortname == "VideoDocument":
+            #     views.append(view)
+            #     continue
+            if anno_type.shortname in required_types:
                 views.append(view)
-                continue
+                break
             # TODO: Couldn't find a simple way to show if an alignment view is a CV/Frames-type view
             elif "parseq" in view.metadata.app:
                 views.append(view)
-                continue
+                break
     return views
 
 
