@@ -2,15 +2,14 @@ from collections import Counter
 from datetime import timedelta
 from io import StringIO
 
-from flask import Flask
+from flask import Flask, url_for
 from lapps.discriminators import Uri
 from mmif import DocumentTypes
-from mmif.serialize.annotation import Text
+from mmif.serialize.annotation import Text, Document
 from mmif.vocabulary import AnnotationTypes
 
-import cache
 import displacy
-from iiif_utils import generate_iiif_manifest
+import iiif_utils
 from ocr import *
 
 # Get Properties from MMIF file ---
@@ -72,6 +71,31 @@ def build_alignment(alignment, token_idx, timeframe_idx):
         return start, end, text
 
 
+def get_src_media_symlink_basename(doc: Document):
+    doc_path = doc.location_path()
+    return f"{doc.id}.{doc_path.split('.')[-1]}"
+
+
+def get_symlink_relurl(viz_id, symlink_fname):
+    static_folder = pathlib.Path(app.static_folder)
+    symlink_path = pathlib.Path(cache._CACHE_DIR_SUFFIX) / viz_id / symlink_fname
+    return static_folder / symlink_path
+
+
+def symlink_to_static(viz_id, original_path, symlink_fname) -> str:
+    static_folder = pathlib.Path(app.static_folder)
+    symlink_path = pathlib.Path(cache._CACHE_DIR_SUFFIX) / viz_id / symlink_fname
+    app.logger.debug(f"Symlinking {original_path} to {symlink_path}")
+    try:
+        os.symlink(original_path, static_folder / symlink_path)
+    except Exception as e:
+        app.logger.error(f"SOME ERROR when symlinking: {str(e)}")
+    app.logger.debug(f"{original_path} is symlinked to {symlink_path}")
+    symlink_rel_path = url_for('static', filename=symlink_path)
+    app.logger.debug(f"and exposable as {symlink_rel_path}")
+    return symlink_rel_path
+
+
 def documents_to_htmls(mmif, viz_id):
     """
     Returns a list of tuples, one for each element in the documents list of
@@ -83,25 +107,25 @@ def documents_to_htmls(mmif, viz_id):
     for document in mmif.documents:
         doc_path = document.location_path()
         app.logger.debug(f"MMIF on AV asset: {doc_path}")
-        doc_symlink_path = pathlib.Path(app.static_folder) / cache._CACHE_DIR_SUFFIX / viz_id / (f"{document.id}.{doc_path.split('.')[-1]}")
-        os.symlink(doc_path, doc_symlink_path)
-        app.logger.debug(f"{doc_path} is symlinked to {doc_symlink_path}")
-        doc_symlink_rel_path = '/' + doc_symlink_path.relative_to(app.static_folder).as_posix()
-        app.logger.debug(f"and {doc_symlink_rel_path} will be used in HTML src attribute")
+        linked = symlink_to_static(viz_id, doc_path, get_src_media_symlink_basename(document))
         if document.at_type == DocumentTypes.TextDocument:
-            html = html_text(doc_symlink_rel_path)
+            html = html_text(linked)
         elif document.at_type == DocumentTypes.VideoDocument:
             fa_views = get_alignment_views(mmif)
             fa_view = fa_views[0] if fa_views else None
-            html = html_video(viz_id, doc_symlink_rel_path, fa_view)
+            html = html_video(viz_id, linked, fa_view)
         elif document.at_type == DocumentTypes.AudioDocument:
-            html = html_audio(doc_symlink_rel_path)
+            html = html_audio(linked)
         elif document.at_type == DocumentTypes.ImageDocument:
             boxes = get_boxes(mmif)
-            html = html_img(doc_symlink_rel_path, boxes)
+            html = html_img(linked, boxes)
         htmlized.append((document.at_type.shortname, document.id, doc_path, html))
-    manifest_filename = generate_iiif_manifest(mmif, viz_id)
+    manifest_filename = iiif_utils.generate_iiif_manifest(mmif, viz_id)
+    app.logger.debug(f"Generated IIIF manifest: {manifest_filename}")
     man = os.path.basename(manifest_filename)
+    app.logger.debug(f"Manifest filename: {man}")
+    l = symlink_to_static(viz_id, manifest_filename, man)
+    app.logger.debug(f"Symlinked IIIF manifest: {None}")
     temp = render_template("uv_player.html", manifest=man, mmif_id=viz_id)
     htmlized.append(('UV', "", "", temp))
     return htmlized

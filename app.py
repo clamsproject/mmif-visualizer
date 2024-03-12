@@ -9,7 +9,8 @@ from mmif.serialize import Mmif
 
 import cache
 from cache import set_last_access, cleanup
-from utils import app, render_ocr, documents_to_htmls, prep_annotations, prepare_ocr_visualization
+import utils
+from utils import app
 
 
 @app.route('/')
@@ -24,7 +25,7 @@ def ocr():
         mmif_str = open(cache.get_cache_root() / data["mmif_id"] / "file.mmif").read()
         mmif = Mmif(mmif_str)
         ocr_view = mmif.get_view_by_id(data["view_id"])
-        return prepare_ocr_visualization(mmif, ocr_view, data["mmif_id"])
+        return utils.prepare_ocr_visualization(mmif, ocr_view, data["mmif_id"])
     except Exception as e:
         return f'<p class="error">{e}</h1>'
 
@@ -33,7 +34,7 @@ def ocr():
 def ocrpage():
     data = request.json
     try:
-        return render_ocr(data["mmif_id"], data['vid_path'], data["view_id"], data["page_number"])
+        return utils.render_ocr(data["mmif_id"], data['vid_path'], data["view_id"], data["page_number"])
     except Exception as e:
         return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
 
@@ -99,16 +100,6 @@ def send_js(path):
     return send_from_directory("uv", path)
 
 
-def render_mmif(mmif_str, viz_id):
-    mmif = Mmif(mmif_str)
-    htmlized_docs = documents_to_htmls(mmif, viz_id)
-    app.logger.debug(f"Prepared document: {[d[0] for d in htmlized_docs]}")
-    annotations = prep_annotations(mmif, viz_id)
-    app.logger.debug(f"Prepared Annotations: {[annotation[0] for annotation in annotations]}")
-    return render_template('player.html',
-                           docs=htmlized_docs, viz_id=viz_id, annotations=annotations)
-
-
 def upload_file(in_mmif):
     # Save file locally
     in_mmif_bytes = in_mmif if isinstance(in_mmif, bytes) else in_mmif.read()
@@ -123,7 +114,13 @@ def upload_file(in_mmif):
         with open(path / 'file.mmif', 'w') as in_mmif_file:
             app.logger.debug(f"Writing original MMIF to {path / 'file.mmif'}")
             in_mmif_file.write(in_mmif_str)
-        html_page = render_mmif(in_mmif_str, viz_id)
+        mmif = Mmif(in_mmif_str)
+        htmlized_docs = utils.documents_to_htmls(mmif, viz_id)
+        app.logger.debug(f"Prepared document: {[d[0] for d in htmlized_docs]}")
+        annotations = utils.prep_annotations(mmif, viz_id)
+        app.logger.debug(f"Prepared Annotations: {[annotation[0] for annotation in annotations]}")
+        html_page = render_template('player.html',
+                               docs=htmlized_docs, viz_id=viz_id, annotations=annotations)
         with open(os.path.join(path, "index.html"), "w") as f:
             f.write(html_page)
     except FileExistsError:
