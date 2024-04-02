@@ -135,8 +135,6 @@ def prep_annotations(mmif, viz_id):
     tabs = []
     tabs.append(("Info", "<pre>" + create_info(mmif) + "</pre>"))
     app.logger.debug(f"Prepared INFO Tab: {tabs[-1][0]}")
-    # tabs.append(("MMIF", "<pre>" + mmif.serialize(pretty=True) + "</pre>"))
-    # app.logger.debug(f"Prepared RAW Tab: {tabs[-1][0]}")
     tabs.append(("Annotations", create_annotation_tables(mmif)))
     app.logger.debug(f"Prepared SUMMARY Tab: {tabs[-1][0]}")
     tabs.append(("Tree", render_interactive_mmif(mmif)))

@@ -164,7 +164,6 @@ def get_ocr_frames(view, mmif):
                 frames[i].update(annotation, mmif)
             else:
                 frames[i] = frame
-    print(frames)
     return frames
 
 

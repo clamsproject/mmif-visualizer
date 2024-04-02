@@ -4,13 +4,18 @@ import secrets
 import sys
 from threading import Thread
 
-from flask import request, render_template, flash, send_from_directory, redirect
+from flask import Flask, request, render_template, flash, send_from_directory, redirect
 from mmif.serialize import Mmif
 
 import cache
 from cache import set_last_access, cleanup
-from utils import app, render_ocr, documents_to_htmls, prep_annotations, prepare_ocr_visualization
+from utils import render_ocr, documents_to_htmls, prep_annotations, prepare_ocr_visualization
 import traceback
+from render import render_documents, render_annotations
+
+# these two static folder-related params are important, do not remove
+app = Flask(__name__, static_folder='static', static_url_path='')
+app.secret_key = 'your_secret_key_here'
 
 
 @app.route('/')
@@ -103,13 +108,12 @@ def send_js(path):
 
 def render_mmif(mmif_str, viz_id):
     mmif = Mmif(mmif_str)
-    htmlized_docs = documents_to_htmls(mmif, viz_id)
-    app.logger.debug(f"Prepared document: {[d[0] for d in htmlized_docs]}")
-    annotations = prep_annotations(mmif, viz_id)
-    app.logger.debug(f"Prepared Annotations: {[annotation[0] for annotation in annotations]}")
+    rendered_documents = render_documents(mmif, viz_id)
+    rendered_annotations = render_annotations(mmif, viz_id)
     return render_template('player.html',
-                           docs=htmlized_docs, viz_id=viz_id, annotations=annotations)
-
+                            docs=rendered_documents,
+                            viz_id=viz_id,
+                            annotations=rendered_annotations)
 
 def upload_file(in_mmif):
     # Save file locally

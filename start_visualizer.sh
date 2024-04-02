@@ -27,5 +27,5 @@ else
 fi
 # Start visualizer
 $container_engine build . -f Containerfile -t clams-mmif-visualizer
-$container_engine run -d --name clams-mmif-visualizer --rm -p 5001:5000 -e PYTHONUNBUFFERED=1 -v $datadir:$mountdir -v $datadir:/app/static/$mountdir clams-mmif-visualizer
+$container_engine run --name clams-mmif-visualizer --rm -p 5001:5000 -e PYTHONUNBUFFERED=1 -v $datadir:$mountdir -v $datadir:/app/static/$mountdir clams-mmif-visualizer
 echo "MMIF Visualizer is running in the background and can be accessed at http://localhost:5001/. To shut it down, run '$container_engine kill clams-mmif-visualizer'"
