@@ -5,7 +5,7 @@ import cache
 def url2posix(path):
     """For the visualizer we often want a POSIX path and not a URL so we strip off
     the protocol if there is one."""
-    if path.startswith('file:///'):
+    if str(path).startswith('file:///'):
         path = path[7:]
     return path
 
@@ -37,12 +37,21 @@ def get_properties(annotation):
     return '{ %s }' % ', '.join(props_list)
 
 
-def get_abstract_view_type(view):
+def get_abstract_view_type(view, mmif):
      annotation_types = [a.shortname for a in view.metadata.contains.keys()]
      if "NamedEntity" in annotation_types:
           return "NER"
      elif all([anno_type in annotation_types for anno_type in ["Token", "TimeFrame", "Alignment"]]):
           return "ASR"
+    # Define an OCR view as one that refers to a video and doesn't contain Sentences
+    # or Tokens
+     else:
+         for configuration in view.metadata.contains.values():
+             if "document" in configuration \
+              and mmif.get_document_by_id(configuration["document"]).at_type.shortname == "VideoDocument":
+                 if not any([anno_type in annotation_types for anno_type in ["Sentence", "Token"]]):
+                     return "OCR"
+                 
      
 
 def get_vtt_file(view, viz_id):

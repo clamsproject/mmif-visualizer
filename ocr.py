@@ -186,7 +186,7 @@ def paginate(frames_list):
     return {i: page for (i, page) in enumerate(pages)}
 
 
-def render_ocr(mmif_id, vid_path, view_id, page_number):
+def render_ocr_page(mmif_id, vid_path, view_id, page_number):
     """
     Iterate through frames and display the contents/alignments.
     """

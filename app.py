@@ -3,13 +3,14 @@ import os
 import secrets
 import sys
 from threading import Thread
+from shutil import rmtree
 
 from flask import Flask, request, render_template, flash, send_from_directory, redirect
 from mmif.serialize import Mmif
 
 import cache
 from cache import set_last_access, cleanup
-from utils import render_ocr, documents_to_htmls, prep_annotations, prepare_ocr_visualization
+from utils import render_ocr_page, documents_to_htmls, prep_annotations, prepare_ocr_visualization
 import traceback
 from render import render_documents, render_annotations
 
@@ -40,7 +41,7 @@ def ocr():
 def ocrpage():
     data = request.json
     try:
-        return render_ocr(data["mmif_id"], data['vid_path'], data["view_id"], data["page_number"])
+        return render_ocr_page(data["mmif_id"], data['vid_path'], data["view_id"], data["page_number"])
     except Exception as e:
         return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
 
@@ -96,7 +97,7 @@ def display(viz_id):
         return html_file
     else:
         app.logger.debug(f"Visualization {viz_id} not found in cache.")
-        os.remove(path)
+        rmtree(path)
         flash("File not found -- please upload again (it may have been deleted to clear up cache space).")
         return redirect("/upload")
 

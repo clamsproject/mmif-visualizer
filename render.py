@@ -15,6 +15,7 @@ from lapps.discriminators import Uri
 import displacy
 
 from helpers import *
+from ocr import get_ocr_frames, paginate, find_duplicates, save_json, render_ocr_page
 
 import cache
 
@@ -30,15 +31,21 @@ def render_documents(mmif, viz_id):
     """
     tabs = []
     for document in mmif.documents:
-        doc_path = get_doc_path(document)
+        # Add symbolic link to document to static folder, so it can be accessed
+        # by the browser.
+        doc_path = document.location_path()
+        doc_symlink_path = pathlib.Path(current_app.static_folder) / cache._CACHE_DIR_SUFFIX / viz_id / (f"{document.id}.{doc_path.split('.')[-1]}")
+        os.symlink(doc_path, doc_symlink_path)
+        doc_symlink_rel_path = '/' + doc_symlink_path.relative_to(current_app.static_folder).as_posix()
+
         if document.at_type == DocumentTypes.TextDocument:
-            html_tab = render_text(doc_path)
+            html_tab = render_text(doc_symlink_rel_path)
         elif document.at_type == DocumentTypes.ImageDocument:
-            html_tab = render_image(doc_path)
+            html_tab = render_image(doc_symlink_rel_path)
         elif document.at_type == DocumentTypes.AudioDocument:
-            html_tab = render_audio(doc_path)
+            html_tab = render_audio(doc_symlink_rel_path)
         elif document.at_type == DocumentTypes.VideoDocument:
-            html_tab = render_video(doc_path, mmif, viz_id)
+            html_tab = render_video(doc_symlink_rel_path, mmif, viz_id)
 
         tabs.append({"id": document.id, 
                      "tab_name": document.at_type.shortname, 
@@ -65,7 +72,7 @@ def render_video(vid_path, mmif, viz_id):
     html.write('<video id="vid" controls crossorigin="anonymous" >\n')
     html.write(f'    <source src=\"{vid_path}\">\n')
     for view in mmif.views:
-        if get_abstract_view_type(view) == "ASR":
+        if get_abstract_view_type(view, mmif) == "ASR":
             vtt_path = get_vtt_file(view, viz_id)
             rel_vtt_path = vtt_path[(len("/tmp/") + len(current_app.static_folder)):]
             html.write(f'    <track kind="captions" srclang="en" src="/{rel_vtt_path}" label="transcript" default/>\n')
@@ -85,12 +92,14 @@ def render_annotations(mmif, viz_id):
     tabs.append({"id": "tree", "tab_name": "Tree", "html": render_jstree(mmif)})
     # These tabs are optional
     for view in mmif.views:
-        abstract_view_type = get_abstract_view_type(view)
+        abstract_view_type = get_abstract_view_type(view, mmif)
         app_shortname = view.metadata.app.split("/")[-2]
         if abstract_view_type == "NER":
             tabs.append({"id": view.id, "tab_name": f"{app_shortname}-{view.id}", "html": render_ner(mmif, view)})
         elif abstract_view_type == "ASR":
             tabs.append({"id": view.id, "tab_name": f"{app_shortname}-{view.id}", "html": render_asr_vtt(view, viz_id)})
+        elif abstract_view_type == "OCR":
+            tabs.append({"id": view.id, "tab_name": f"{app_shortname}-{view.id}", "html": render_ocr(mmif, view, viz_id)})
     return tabs
 
 def render_info(mmif):
@@ -149,5 +158,15 @@ def render_ner(mmif, view):
     ner_document = metadata.get('document')
     return displacy.visualize_ner(mmif, view, ner_document, current_app.root_path)
 
-def render_ocr():
-    pass
+def render_ocr(mmif, view, viz_id):
+    vid_path = mmif.get_documents_by_type(DocumentTypes.VideoDocument)[0].location_path()
+
+    ocr_frames = get_ocr_frames(view, mmif)
+
+    # Generate pages (necessary to reduce IO cost) and render
+    frames_list = [(k, vars(v)) for k, v in ocr_frames.items()]
+    frames_list = find_duplicates(frames_list)
+    frames_pages = paginate(frames_list)
+    # Save page list as temp file
+    save_json(frames_pages, view.id, viz_id)
+    return render_ocr_page(viz_id, vid_path, view.id, 0)
