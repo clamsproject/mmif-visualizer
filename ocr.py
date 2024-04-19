@@ -8,6 +8,7 @@ import re
 import os, shutil
 
 from flask import render_template
+from mmif import AnnotationTypes, DocumentTypes, Mmif
 from mmif.utils.video_document_helper import convert_timepoint, convert_timeframe
 
 import cache
@@ -36,16 +37,16 @@ class OCRFrame():
 
     def update(self, anno, mmif):
 
-        if anno.at_type.shortname == "BoundingBox":
+        if anno.at_type == AnnotationTypes.BoundingBox:
             self.add_bounding_box(anno, mmif)
 
-        elif anno.at_type.shortname == "TimeFrame":
+        elif anno.at_type == AnnotationTypes.TimeFrame:
             self.add_timeframe(anno, mmif)
 
-        elif anno.at_type.shortname == "TimePoint":
+        elif anno.at_type == AnnotationTypes.TimePoint:
             self.add_timepoint(anno, mmif)
 
-        elif anno.at_type.shortname == "TextDocument":
+        elif anno.at_type == DocumentTypes.TextDocument:
             self.add_text_document(anno)
 
         elif anno.at_type.shortname == "Paragraph":
@@ -111,7 +112,7 @@ class OCRFrame():
             # If there are TimeFrames in the same view, they most likely represent
             # condensed information about representative frames (e.g. SWT). In this 
             # case, only render the TimeFrames and ignore the TimePoints.
-            if any([anno.shortname == "TimeFrame" for anno in other_annotations]) and skip_if_view_has_frames:
+            if any([anno == AnnotationTypes.TimeFrame for anno in other_annotations]) and skip_if_view_has_frames:
                 return
             self.frame_num = convert_timepoint(mmif, anno, "frames")
             self.secs = convert_timepoint(mmif, anno, "seconds")
@@ -139,12 +140,12 @@ def find_annotation(anno_id, mmif):
 def get_ocr_frames(view, mmif):
     frames = {}
     full_alignment_type = [
-        at_type for at_type in view.metadata.contains if at_type.shortname == "Alignment"]
+        at_type for at_type in view.metadata.contains if at_type == AnnotationTypes.Alignment]
     # If view contains alignments
     if full_alignment_type:
         for alignment in view.get_annotations(full_alignment_type[0]):
-            source = find_annotation(alignment.properties["source"], mmif)
-            target = find_annotation(alignment.properties["target"], mmif)
+            source = find_annotation(alignment.get("source"), mmif)
+            target = find_annotation(alignment.get("target"), mmif)
 
             # Account for alignment in either direction
             frame = OCRFrame(source, mmif)

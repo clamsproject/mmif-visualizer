@@ -83,15 +83,9 @@ def mmif_to_dict(mmif: Mmif):
 
 
 def entity(view: View, annotation: Annotation):
-    if "targets" in annotation.properties:
-        start = min([view.annotations[target].properties["start"] for target in annotation.properties["targets"]])
-        end = max([view.annotations[target].properties["end"] for target in annotation.properties["targets"]])
-    else:
-        start = annotation.properties['start']
-        end = annotation.properties['end']
-    return {'start': start,
-            'end': end,
-            'label': annotation.properties['category']}
+    return {'start': annotation.get('start'),
+            'end': annotation.get('end'),
+            'label': annotation.get('category')}
 
 
 def dict_to_html(d):

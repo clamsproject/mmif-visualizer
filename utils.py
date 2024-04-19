@@ -61,15 +61,17 @@ def asr_alignments_to_vtt(alignment_view, viz_id):
 
 
 def build_alignment(alignment, token_idx, timeframe_idx):
-    target = alignment.properties['target']
-    source = alignment.properties['source']
+    target = alignment.get('target')
+    source = alignment.get('source')
     timeframe = timeframe_idx.get(source)
     token = token_idx.get(target)
     if timeframe and token:
-        start = timeframe.properties['start']
-        end = timeframe.properties['end']
-        text = token.properties['word']
-        return start, end, text
+        start = timeframe.get('start')
+        end = timeframe.get('end')
+        for text_key in ['text', 'word']:
+            if text_key in token:
+                text = token.get(text_key)
+                return start, end, text
 
 
 def documents_to_htmls(mmif, viz_id):
@@ -119,12 +121,12 @@ def get_boxes(mmif):
     # Javascript code that draws the rectangle.
     boxes = []
     for a in tbox_annotations:
-        coordinates = a.properties["coordinates"]
+        coordinates = a.get("coordinates")
         x = coordinates[0][0]
         y = coordinates[0][1]
         w = coordinates[1][0] - x
         h = coordinates[2][1] - y
-        box = [a.properties["id"], a.properties["boxType"], [x, y, w, h]]
+        box = [a.get("id"), a.get("boxType"), [x, y, w, h]]
         boxes.append(box)
     return boxes
 
@@ -217,7 +219,7 @@ def get_document_ids(view, annotation_type):
     for annotation in view.annotations:
         if annotation.at_type.shortname == str(annotation_type):
             try:
-                ids.add(annotation.properties["document"])
+                ids.add(annotation.get("document"))
             except KeyError:
                 pass
     return list(ids)
