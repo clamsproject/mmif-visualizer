@@ -53,19 +53,26 @@ class OCRFrame():
             text_anno = view.get_annotation_by_id(anno.properties.get("document"))
             self.add_text_document(text_anno)
 
-
-    def add_bounding_box(self, anno, mmif):
+    def add_bounding_box(self, anno, mmif: Mmif):
+        timepoint_anno = None
         if "timePoint" in anno.properties:
-            timepoint_anno = find_annotation(anno.properties["timePoint"], mmif)
+            timepoint_anno = find_annotation(anno.get("timePoint"), mmif)
 
-            if timepoint_anno:
-                self.add_timepoint(timepoint_anno, mmif, skip_if_view_has_frames=False)
         else:
-            self.frame_num = convert_timepoint(mmif, anno, "frames")
-            self.secs = convert_timepoint(mmif, anno, "seconds")
-        box_id = anno.properties["id"]
-        boxType = anno.properties["boxType"]
-        coordinates = anno.properties["coordinates"]
+            for alignment_anns in mmif.get_alignments(AnnotationTypes.BoundingBox, AnnotationTypes.TimePoint).values():
+                for alignment_ann in alignment_anns:
+                    if alignment_ann.get('source') == anno.id:
+                        timepoint_anno = find_annotation(alignment_ann.get('target'), mmif)
+                        break
+                    elif alignment_ann.get('target') == anno.id:
+                        timepoint_anno = find_annotation(alignment_ann.get('source'), mmif)
+                        break
+        if timepoint_anno:
+            self.add_timepoint(timepoint_anno, mmif, skip_if_view_has_frames=False)
+
+        box_id = anno.get("id")
+        boxType = anno.get("boxType")
+        coordinates = anno.get("coordinates")
         x = coordinates[0][0]
         y = coordinates[0][1]
         w = coordinates[1][0] - x
