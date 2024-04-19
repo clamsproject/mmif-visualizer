@@ -71,9 +71,7 @@ class OCRFrame():
         w = coordinates[1][0] - x
         h = coordinates[1][1] - y
         box = [box_id, boxType, [x, y, w, h]]
-        # TODO: This is a hack to ignore percentage-based Doctr bounding boxes
-        if "doctr" not in mmif.get_view_by_id(anno.parent).metadata["app"]:
-            self.boxes.append(box)
+        self.boxes.append(box)
         self.anno_ids.append(box_id)
         self.timestamp = str(datetime.timedelta(seconds=self.secs))
         if anno.properties.get("boxType") and anno.properties.get("boxType") not in self.boxtypes:
