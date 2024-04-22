@@ -51,22 +51,22 @@ class OCRFrame():
 
         elif anno.at_type.shortname == "Paragraph":
             view = mmif.get_view_by_id(anno.parent)
-            text_anno = view.get_annotation_by_id(anno.properties.get("document"))
+            text_anno = mmif[anno.properties.get("document")]
             self.add_text_document(text_anno)
 
     def add_bounding_box(self, anno, mmif: Mmif):
         timepoint_anno = None
         if "timePoint" in anno.properties:
-            timepoint_anno = find_annotation(anno.get("timePoint"), mmif)
+            timepoint_anno = mmif[anno.get("timePoint")]
 
         else:
             for alignment_anns in mmif.get_alignments(AnnotationTypes.BoundingBox, AnnotationTypes.TimePoint).values():
                 for alignment_ann in alignment_anns:
                     if alignment_ann.get('source') == anno.id:
-                        timepoint_anno = find_annotation(alignment_ann.get('target'), mmif)
+                        timepoint_anno = mmif[alignment_ann.get('target')]
                         break
                     elif alignment_ann.get('target') == anno.id:
-                        timepoint_anno = find_annotation(alignment_ann.get('source'), mmif)
+                        timepoint_anno = mmif[alignment_ann.get('source')]
                         break
         if timepoint_anno:
             self.add_timepoint(timepoint_anno, mmif, skip_if_view_has_frames=False)
@@ -90,7 +90,7 @@ class OCRFrame():
         if "targets" in anno.properties:
             start_id, end_id = anno.properties.get("targets")[0], anno.properties.get("targets")[-1]
             anno_parent = mmif.get_view_by_id(anno.parent)
-            start_anno, end_anno = anno_parent.get_annotation_by_id(start_id), anno_parent.get_annotation_by_id(end_id)
+            start_anno, end_anno = mmif[start_id], mmif[end_id]
             start = convert_timepoint(mmif, start_anno, "frames")
             end = convert_timepoint(mmif, end_anno, "frames")
             start_secs = convert_timepoint(mmif, start_anno, "seconds")
@@ -126,16 +126,6 @@ class OCRFrame():
             text_val = re.sub(r'([\\\/\|\"\'])', r'\1 ', t)
             self.text = self.text + [text_val] if text_val not in self.text else self.text
 
-def find_annotation(anno_id, mmif):
-    if mmif.id_delimiter in anno_id:
-        view_id, anno_id = anno_id.split(mmif.id_delimiter)
-        view = mmif.get_view_by_id(view_id)
-    for view in mmif.views:
-        try:
-            return view.get_annotation_by_id(anno_id)
-        except KeyError:
-            continue
-
 
 def get_ocr_frames(view, mmif):
     frames = {}
@@ -144,8 +134,8 @@ def get_ocr_frames(view, mmif):
     # If view contains alignments
     if full_alignment_type:
         for alignment in view.get_annotations(full_alignment_type[0]):
-            source = find_annotation(alignment.get("source"), mmif)
-            target = find_annotation(alignment.get("target"), mmif)
+            source = mmif[alignment.get("source")]
+            target = mmif[alignment.get("target")]
 
             # Account for alignment in either direction
             frame = OCRFrame(source, mmif)
