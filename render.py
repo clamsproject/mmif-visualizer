@@ -1,16 +1,11 @@
 import os
 import pathlib
-import shutil
-import tempfile
-import threading
-import time
 from io import StringIO
 from collections import Counter
 from flask import render_template, current_app
+import re
 
 from mmif import DocumentTypes
-from mmif.serialize.annotation import Text
-from mmif.vocabulary import AnnotationTypes
 from lapps.discriminators import Uri
 import displacy
 
@@ -74,7 +69,7 @@ def render_video(vid_path, mmif, viz_id):
     for view in mmif.views:
         if get_abstract_view_type(view, mmif) == "ASR":
             vtt_path = get_vtt_file(view, viz_id)
-            rel_vtt_path = vtt_path[(len("/tmp/") + len(current_app.static_folder)):]
+            rel_vtt_path = re.search("mmif-viz-cache/.*", vtt_path).group(0)
             html.write(f'    <track kind="captions" srclang="en" src="/{rel_vtt_path}" label="transcript" default/>\n')
     html.write("</video>\n")
     return html.getvalue()
