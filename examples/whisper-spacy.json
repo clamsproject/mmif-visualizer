@@ -8,7 +8,7 @@
             "properties": {
                 "mime": "video",
                 "id": "d1",
-                "location": "file:///data/video/service-mbrs-ntscrm-01181182.mp4"
+                "location": "file:///data/service-mbrs-ntscrm-01181182.mp4"
             }
         },
         {
@@ -16,7 +16,7 @@
             "properties": {
                 "mime": "audio",
                 "id": "d2",
-                "location": "file:///data/audio/service-mbrs-ntscrm-01181182.wav"
+                "location": "file:///data/service-mbrs-ntscrm-01181182.wav"
             }
         },
         {
@@ -24,7 +24,7 @@
             "properties": {
                 "mime": "text",
                 "id": "d3",
-                "location": "file:///data/text/service-mbrs-ntscrm-01181182.txt"
+                "location": "file:///data/service-mbrs-ntscrm-01181182.txt"
             }
         }
     ],
