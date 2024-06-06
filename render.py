@@ -8,6 +8,7 @@ import re
 from mmif import DocumentTypes
 from lapps.discriminators import Uri
 import displacy
+import traceback
 
 from helpers import *
 from ocr import get_ocr_frames, paginate, find_duplicates, save_json, render_ocr_page
@@ -26,29 +27,36 @@ def render_documents(mmif, viz_id):
     """
     tabs = []
     for document in mmif.documents:
-        # Add symbolic link to document to static folder, so it can be accessed
-        # by the browser.
-        doc_path = document.location_path()
-        doc_symlink_path = pathlib.Path(current_app.static_folder) / cache._CACHE_DIR_SUFFIX / viz_id / (f"{document.id}.{doc_path.split('.')[-1]}")
-        os.symlink(doc_path, doc_symlink_path)
-        doc_symlink_rel_path = '/' + doc_symlink_path.relative_to(current_app.static_folder).as_posix()
+        try:
+            # Add symbolic link to document to static folder, so it can be accessed
+            # by the browser.
+            doc_path = document.location_path()
+            doc_symlink_path = pathlib.Path(current_app.static_folder) / cache._CACHE_DIR_SUFFIX / viz_id / (f"{document.id}.{doc_path.split('.')[-1]}")
+            os.symlink(doc_path, doc_symlink_path)
+            doc_symlink_rel_path = '/' + doc_symlink_path.relative_to(current_app.static_folder).as_posix()
 
-        if document.at_type == DocumentTypes.TextDocument:
-            html_tab = render_text(doc_symlink_rel_path)
-        elif document.at_type == DocumentTypes.ImageDocument:
-            html_tab = render_image(doc_symlink_rel_path)
-        elif document.at_type == DocumentTypes.AudioDocument:
-            html_tab = render_audio(doc_symlink_rel_path)
-        elif document.at_type == DocumentTypes.VideoDocument:
-            html_tab = render_video(doc_symlink_rel_path, mmif, viz_id)
+            if document.at_type == DocumentTypes.TextDocument:
+                html_tab = render_text(doc_path)
+            elif document.at_type == DocumentTypes.ImageDocument:
+                html_tab = render_image(doc_symlink_rel_path)
+            elif document.at_type == DocumentTypes.AudioDocument:
+                html_tab = render_audio(doc_symlink_rel_path)
+            elif document.at_type == DocumentTypes.VideoDocument:
+                html_tab = render_video(doc_symlink_rel_path, mmif, viz_id)
 
-        tabs.append({"id": document.id, 
-                     "tab_name": document.at_type.shortname, 
-                     "html": html_tab})
+            tabs.append({"id": document.id, 
+                        "tab_name": document.at_type.shortname, 
+                        "html": html_tab})
+            
+        except Exception:
+            tabs.append({"id": document.id, 
+                        "tab_name": document.at_type.shortname, 
+                        "html": f"Error rendering document: <br><br> <pre>{traceback.format_exc()}</pre>"})
     return tabs
 
 def render_text(text_path):
     """Return the content of the text document, but with some HTML tags added."""
+    text_path = url2posix(text_path)
     if not os.path.isfile(text_path):
         raise FileNotFoundError(f"File not found: {text_path}")
     with open(text_path) as t_file:
@@ -56,10 +64,18 @@ def render_text(text_path):
         return f"{content}\n"
 
 def render_image(img_path):
-    return ""
+    img_path = url2posix(img_path)
+    html = StringIO()
+    html.write(f'<img src=\"{img_path}\" alt="Image" style="max-width: 100%">\n')
+    return html.getvalue()
 
 def render_audio(audio_path):
-    return ""
+    audio_path = url2posix(audio_path)
+    html = StringIO()
+    html.write('<audio id="audioplayer" controls crossorigin="anonymous">\n')
+    html.write(f'    <source src=\"{audio_path}\">\n')
+    html.write("</audio>\n")
+    return html.getvalue()
 
 def render_video(vid_path, mmif, viz_id):
     vid_path = url2posix(vid_path)
@@ -87,14 +103,23 @@ def render_annotations(mmif, viz_id):
     tabs.append({"id": "tree", "tab_name": "Tree", "html": render_jstree(mmif)})
     # These tabs are optional
     for view in mmif.views:
-        abstract_view_type = get_abstract_view_type(view, mmif)
-        app_shortname = view.metadata.app.split("/")[-2]
-        if abstract_view_type == "NER":
-            tabs.append({"id": view.id, "tab_name": f"{app_shortname}-{view.id}", "html": render_ner(mmif, view)})
-        elif abstract_view_type == "ASR":
-            tabs.append({"id": view.id, "tab_name": f"{app_shortname}-{view.id}", "html": render_asr_vtt(view, viz_id)})
-        elif abstract_view_type == "OCR":
-            tabs.append({"id": view.id, "tab_name": f"{app_shortname}-{view.id}", "html": render_ocr(mmif, view, viz_id)})
+        try:
+            abstract_view_type = get_abstract_view_type(view, mmif)
+            # Workaround to deal with the fact that some apps have a version number in the URL
+            app_url = view.metadata.app if re.search(r"\/v\d+\.?\d?$", view.metadata.app) else view.metadata.app + "/v1"
+            app_shortname = app_url.split("/")[-2]
+            if abstract_view_type == "NER":
+                tabs.append({"id": view.id, "tab_name": f"{app_shortname}-{view.id}", "html": render_ner(mmif, view)})
+            elif abstract_view_type == "ASR":
+                tabs.append({"id": view.id, "tab_name": f"{app_shortname}-{view.id}", "html": render_asr_vtt(view, viz_id)})
+            elif abstract_view_type == "OCR":
+                tabs.append({"id": view.id, "tab_name": f"{app_shortname}-{view.id}", "html": render_ocr(mmif, view, viz_id)})
+        
+        except Exception as e:
+            tabs.append({"id": view.id, 
+                         "tab_name": view.id, 
+                         "html": f"Error rendering annotations: <br><br> <pre>{traceback.format_exc()}</pre>"})
+    
     return tabs
 
 def render_info(mmif):

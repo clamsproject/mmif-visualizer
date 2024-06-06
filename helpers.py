@@ -64,6 +64,11 @@ def get_vtt_file(view, viz_id):
 
 def write_vtt(view, viz_id):
     vtt = "WEBVTT\n\n"
+    timeunit = "milliseconds"
+    for a in view.metadata.contains.values():
+        if "timeUnit" in a:
+            timeunit = a["timeUnit"]
+            break
     token_idx = {a.id: a for a in view.annotations if a.at_type.shortname == "Token"}
     timeframe_idx = {a.id: a for a in view.annotations if a.at_type.shortname == "TimeFrame"}
     alignments = [a for a in view.annotations if a.at_type.shortname == "Alignment"]
@@ -75,10 +80,10 @@ def write_vtt(view, viz_id):
             continue
         start, end, text = start_end_text
         if not vtt_start:
-            vtt_start = format_time(start)
+            vtt_start = format_time(start, timeunit)
         texts.append(text)
         if len(texts) > 8:
-            vtt_end = format_time(end)
+            vtt_end = format_time(end, timeunit)
             vtt += f"{vtt_start} --> {vtt_end}\n{' '.join(texts)}\n\n"
             vtt_start = None
             texts = []
@@ -97,7 +102,7 @@ def build_alignment(alignment, token_idx, timeframe_idx):
         return start, end, text
 
 
-def format_time(time_in_ms):
+def format_time(time, unit):
     """
     Formats a time in seconds as a string in the format "hh:mm:ss.fff"
     VTT specifically requires timestamps expressed in miliseconds and
@@ -105,6 +110,10 @@ def format_time(time_in_ms):
     (https://developer.mozilla.org/en-US/docs/Web/API/WebVTT_API)
     ISO format can have up to 6 below the decimal point, on the other hand
     """
+    if unit == "seconds":
+        time_in_ms = int(time * 1000)
+    else:
+        time_in_ms = int(time)
     hours = time_in_ms // (1000 * 60 * 60)
     time_in_ms %= (1000 * 60 * 60)
     minutes = time_in_ms // (1000 * 60)
