@@ -10,9 +10,8 @@ from mmif.serialize import Mmif
 
 import cache
 from cache import set_last_access, cleanup
-from utils import render_ocr_page, documents_to_htmls, prep_annotations, prepare_ocr_visualization
 import traceback
-from render import render_documents, render_annotations
+from render import render_documents, render_annotations, prepare_and_render_ocr, render_ocr_page
 
 # these two static folder-related params are important, do not remove
 app = Flask(__name__, static_folder='static', static_url_path='')
@@ -31,7 +30,7 @@ def ocr():
         mmif_str = open(cache.get_cache_root() / data["mmif_id"] / "file.mmif").read()
         mmif = Mmif(mmif_str)
         ocr_view = mmif.get_view_by_id(data["view_id"])
-        return prepare_ocr_visualization(mmif, ocr_view, data["mmif_id"])
+        return prepare_and_render_ocr(mmif, ocr_view, data["mmif_id"])
     except Exception as e:
         app.logger.error(f"{e}\n{traceback.format_exc()}")
         return f'<p class="error">Error: {e} Check the server log for more information.</h1>'
