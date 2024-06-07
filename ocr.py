@@ -1,13 +1,11 @@
 import datetime
-import pathlib
 
 import cv2
-import tempfile
 import json
 import re
-import os, shutil
+import os
+import shutil
 
-from flask import render_template
 from mmif.utils.video_document_helper import convert_timepoint, convert_timeframe
 
 import cache
@@ -50,16 +48,18 @@ class OCRFrame():
 
         elif anno.at_type.shortname == "Paragraph":
             view = mmif.get_view_by_id(anno.parent)
-            text_anno = view.get_annotation_by_id(anno.properties.get("document"))
+            text_anno = view.get_annotation_by_id(
+                anno.properties.get("document"))
             self.add_text_document(text_anno)
-
 
     def add_bounding_box(self, anno, mmif):
         if "timePoint" in anno.properties:
-            timepoint_anno = find_annotation(anno.properties["timePoint"], mmif)
+            timepoint_anno = find_annotation(
+                anno.properties["timePoint"], mmif)
 
             if timepoint_anno:
-                self.add_timepoint(timepoint_anno, mmif, skip_if_view_has_frames=False)
+                self.add_timepoint(timepoint_anno, mmif,
+                                   skip_if_view_has_frames=False)
         else:
             self.frame_num = convert_timepoint(mmif, anno, "frames")
             self.secs = convert_timepoint(mmif, anno, "seconds")
@@ -82,9 +82,11 @@ class OCRFrame():
     def add_timeframe(self, anno, mmif):
         # If annotation has multiple targets, pick the first and last as start and end
         if "targets" in anno.properties:
-            start_id, end_id = anno.properties.get("targets")[0], anno.properties.get("targets")[-1]
+            start_id, end_id = anno.properties.get(
+                "targets")[0], anno.properties.get("targets")[-1]
             anno_parent = mmif.get_view_by_id(anno.parent)
-            start_anno, end_anno = anno_parent.get_annotation_by_id(start_id), anno_parent.get_annotation_by_id(end_id)
+            start_anno, end_anno = anno_parent.get_annotation_by_id(
+                start_id), anno_parent.get_annotation_by_id(end_id)
             start = convert_timepoint(mmif, start_anno, "frames")
             end = convert_timepoint(mmif, end_anno, "frames")
             start_secs = convert_timepoint(mmif, start_anno, "seconds")
@@ -93,7 +95,8 @@ class OCRFrame():
             start, end = convert_timeframe(mmif, anno, "frames")
             start_secs, end_secs = convert_timeframe(mmif, anno, "seconds")
         self.range = (start, end)
-        self.timestamp_range = (str(datetime.timedelta(seconds=start_secs)), str(datetime.timedelta(seconds=end_secs)))
+        self.timestamp_range = (str(datetime.timedelta(seconds=start_secs)), str(
+            datetime.timedelta(seconds=end_secs)))
         self.sec_range = (start_secs, end_secs)
         if anno.properties.get("frameType"):
             self.frametype = str(anno.properties.get("frameType"))
@@ -101,24 +104,28 @@ class OCRFrame():
             self.frametype = str(anno.properties.get("label"))
 
     def add_timepoint(self, anno, mmif, skip_if_view_has_frames=True):
-            parent = mmif.get_view_by_id(anno.parent)
-            other_annotations = [k for k in parent.metadata.contains.keys() if k != anno.id]
-            # If there are TimeFrames in the same view, they most likely represent
-            # condensed information about representative frames (e.g. SWT). In this 
-            # case, only render the TimeFrames and ignore the TimePoints.
-            if any([anno.shortname == "TimeFrame" for anno in other_annotations]) and skip_if_view_has_frames:
-                return
-            self.frame_num = convert_timepoint(mmif, anno, "frames")
-            self.secs = convert_timepoint(mmif, anno, "seconds")
-            self.timestamp = str(datetime.timedelta(seconds=self.secs))
-            if anno.properties.get("label"):
-                self.frametype = anno.properties.get("label")
+        parent = mmif.get_view_by_id(anno.parent)
+        other_annotations = [
+            k for k in parent.metadata.contains.keys() if k != anno.id]
+        # If there are TimeFrames in the same view, they most likely represent
+        # condensed information about representative frames (e.g. SWT). In this
+        # case, only render the TimeFrames and ignore the TimePoints.
+        if any([anno.shortname == "TimeFrame" for anno in other_annotations]) and skip_if_view_has_frames:
+            return
+        self.frame_num = convert_timepoint(mmif, anno, "frames")
+        self.secs = convert_timepoint(mmif, anno, "seconds")
+        self.timestamp = str(datetime.timedelta(seconds=self.secs))
+        if anno.properties.get("label"):
+            self.frametype = anno.properties.get("label")
 
     def add_text_document(self, anno):
-        t = anno.properties.get("text_value") or anno.properties.get("text").value
+        t = anno.properties.get(
+            "text_value") or anno.properties.get("text").value
         if t:
             text_val = re.sub(r'([\\\/\|\"\'])', r'\1 ', t)
-            self.text = self.text + [text_val] if text_val not in self.text else self.text
+            self.text = self.text + \
+                [text_val] if text_val not in self.text else self.text
+
 
 def find_annotation(anno_id, mmif):
     if mmif.id_delimiter in anno_id:
@@ -153,7 +160,7 @@ def get_ocr_frames(view, mmif):
                 frames[i].update(target, mmif)
             else:
                 frames[i] = frame
-            
+
     else:
         for annotation in view.get_annotations():
             frame = OCRFrame(annotation, mmif)
@@ -184,6 +191,7 @@ def paginate(frames_list):
             n_frames_on_page += 1
 
     return {i: page for (i, page) in enumerate(pages)}
+
 
 def make_image_directory(mmif_id):
     # Make path for temp OCR image files or clear image files if it exists
@@ -232,10 +240,14 @@ def is_duplicate_image(prev_frame, frame, cv2_vid):
     img2_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
     # Calculate the histogram and normalize it
-    hist_img1 = cv2.calcHist([img1_hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
-    cv2.normalize(hist_img1, hist_img1, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX);
-    hist_img2 = cv2.calcHist([img2_hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
-    cv2.normalize(hist_img2, hist_img2, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX);
+    hist_img1 = cv2.calcHist([img1_hsv], [0, 1], None, [
+                             180, 256], [0, 180, 0, 256])
+    cv2.normalize(hist_img1, hist_img1, alpha=0,
+                  beta=1, norm_type=cv2.NORM_MINMAX)
+    hist_img2 = cv2.calcHist([img2_hsv], [0, 1], None, [
+                             180, 256], [0, 180, 0, 256])
+    cv2.normalize(hist_img2, hist_img2, alpha=0,
+                  beta=1, norm_type=cv2.NORM_MINMAX)
 
     # Find the metric value
     metric_val = cv2.compareHist(hist_img1, hist_img2, cv2.HISTCMP_CHISQR)

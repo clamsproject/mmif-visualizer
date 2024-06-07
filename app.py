@@ -29,30 +29,6 @@ def ocr():
         return serve_first_ocr_page(request.json)
     else:
         return serve_ocr_page(request.json)
-    
-
-def serve_first_ocr_page(data):
-    """
-    Prepares OCR (at load time, due to lazy loading) and serves the first page
-    """
-    try:
-        data = dict(request.json)
-        mmif_str = open(cache.get_cache_root() / data["mmif_id"] / "file.mmif").read()
-        mmif = Mmif(mmif_str)
-        ocr_view = mmif.get_view_by_id(data["view_id"])
-        return prepare_and_render_ocr(mmif, ocr_view, data["mmif_id"])
-    except Exception as e:
-        app.logger.error(f"{e}\n{traceback.format_exc()}")
-        return f'<p class="error">Error: {e} Check the server log for more information.</h1>'
-
-def serve_ocr_page(data):
-    """
-    Serves subsequent OCR pages
-    """
-    try:
-        return render_ocr_page(data["mmif_id"], data['vid_path'], data["view_id"], data["page_number"])
-    except Exception as e:
-        return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
 
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -121,9 +97,36 @@ def render_mmif(mmif_str, viz_id):
     rendered_documents = render_documents(mmif, viz_id)
     rendered_annotations = render_annotations(mmif, viz_id)
     return render_template('player.html',
-                            docs=rendered_documents,
-                            viz_id=viz_id,
-                            annotations=rendered_annotations)
+                           docs=rendered_documents,
+                           viz_id=viz_id,
+                           annotations=rendered_annotations)
+
+
+def serve_first_ocr_page(data):
+    """
+    Prepares OCR (at load time, due to lazy loading) and serves the first page
+    """
+    try:
+        data = dict(request.json)
+        mmif_str = open(cache.get_cache_root() /
+                        data["mmif_id"] / "file.mmif").read()
+        mmif = Mmif(mmif_str)
+        ocr_view = mmif.get_view_by_id(data["view_id"])
+        return prepare_and_render_ocr(mmif, ocr_view, data["mmif_id"])
+    except Exception as e:
+        app.logger.error(f"{e}\n{traceback.format_exc()}")
+        return f'<p class="error">Error: {e} Check the server log for more information.</h1>'
+
+
+def serve_ocr_page(data):
+    """
+    Serves subsequent OCR pages
+    """
+    try:
+        return render_ocr_page(data["mmif_id"], data['vid_path'], data["view_id"], data["page_number"])
+    except Exception as e:
+        return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
+
 
 def upload_file(in_mmif):
     # Save file locally
@@ -159,7 +162,8 @@ def upload_file(in_mmif):
 if __name__ == '__main__':
     # Make path for temp files
     cache_path = cache.get_cache_root()
-    cache_symlink_path = os.path.join(app.static_folder, cache._CACHE_DIR_SUFFIX)
+    cache_symlink_path = os.path.join(
+        app.static_folder, cache._CACHE_DIR_SUFFIX)
     if os.path.islink(cache_symlink_path):
         os.unlink(cache_symlink_path)
     elif os.path.exists(cache_symlink_path):
@@ -174,5 +178,5 @@ if __name__ == '__main__':
     port = 5000
     if len(sys.argv) > 2 and sys.argv[1] == '-p':
         port = int(sys.argv[2])
-        
+
     app.run(port=port, host='0.0.0.0', debug=True, use_reloader=True)
