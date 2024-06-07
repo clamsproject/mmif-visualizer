@@ -4,9 +4,8 @@ from io import StringIO
 
 from flask import Flask, url_for
 from lapps.discriminators import Uri
-from mmif import DocumentTypes
 from mmif.serialize.annotation import Text, Document
-from mmif.vocabulary import AnnotationTypes
+from mmif.utils.timeunit_helper import UNIT_NORMALIZATION
 
 import displacy
 import iiif_utils
@@ -19,6 +18,13 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = 'your_secret_key_here'
 
 
+def normalize_timeunit(tu_str):
+    if tu_str in UNIT_NORMALIZATION:
+        return UNIT_NORMALIZATION[tu_str]
+    else:
+        return tu_str
+
+
 def asr_alignments_to_vtt(alignment_view, viz_id):
     vtt_filename = cache.get_cache_root() / viz_id / f"{alignment_view.id.replace(':', '-')}.vtt" 
     if vtt_filename.exists():
@@ -27,7 +33,10 @@ def asr_alignments_to_vtt(alignment_view, viz_id):
     vtt_file.write("WEBVTT\n\n")
     annotations = alignment_view.annotations
     timeframe_at_type = [at_type for at_type in alignment_view.metadata.contains if at_type.shortname == "TimeFrame"][0]
-    timeunit = alignment_view.metadata.contains[timeframe_at_type]["timeUnit"]
+    timeunit = normalize_timeunit(alignment_view.metadata.contains[timeframe_at_type]["timeUnit"])
+    # make plural so that this key can be used in timedelta init
+    if timeunit[-1] != 's':
+        timeunit += 's'
     # TODO: wanted to use "mmif.get_alignments(AnnotationTypes.TimeFrame, Uri.TOKEN)"
     # but that gave errors so I gave up on it
     token_idx = {a.id: a for a in annotations if a.at_type.shortname == "Token"}
