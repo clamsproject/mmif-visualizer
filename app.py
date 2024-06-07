@@ -25,6 +25,16 @@ def index():
 
 @app.route('/ocr', methods=['POST'])
 def ocr():
+    if "page_number" not in request.json:
+        return serve_first_ocr_page(request.json)
+    else:
+        return serve_ocr_page(request.json)
+    
+
+def serve_first_ocr_page(data):
+    """
+    Prepares OCR (at load time, due to lazy loading) and serves the first page
+    """
     try:
         data = dict(request.json)
         mmif_str = open(cache.get_cache_root() / data["mmif_id"] / "file.mmif").read()
@@ -35,10 +45,10 @@ def ocr():
         app.logger.error(f"{e}\n{traceback.format_exc()}")
         return f'<p class="error">Error: {e} Check the server log for more information.</h1>'
 
-
-@app.route('/ocrpage', methods=['POST'])
-def ocrpage():
-    data = request.json
+def serve_ocr_page(data):
+    """
+    Serves subsequent OCR pages
+    """
     try:
         return render_ocr_page(data["mmif_id"], data['vid_path'], data["view_id"], data["page_number"])
     except Exception as e:

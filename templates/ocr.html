@@ -142,7 +142,7 @@ function changePage(page) {
         if (data["page_number"] >= 0 && data["page_number"] < parseInt("{{n_pages}}")) {
             $.ajax({
             type:'POST',
-            url:'/ocrpage',
+            url:'/ocr',
             contentType: "application/json",
             data: JSON.stringify(data),
             success: function(res_html){
