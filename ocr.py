@@ -127,6 +127,21 @@ class OCRFrame():
                 [text_val] if text_val not in self.text else self.text
 
 
+def prepare_ocr(mmif, view, viz_id):
+    """
+    Prepares list of frames that will be passed back and forth between server
+    and client, and renders the first page of the OCR.
+    """
+    ocr_frames = get_ocr_frames(view, mmif)
+
+    # Generate pages (necessary to reduce IO cost) and render
+    frames_list = [(k, vars(v)) for k, v in ocr_frames.items()]
+    frames_list = find_duplicates(frames_list)
+    frames_pages = paginate(frames_list)
+    # Save page list as temp file
+    save_json(frames_pages, view.id, viz_id)
+
+
 def find_annotation(anno_id, mmif):
     if mmif.id_delimiter in anno_id:
         view_id, anno_id = anno_id.split(mmif.id_delimiter)
