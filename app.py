@@ -7,11 +7,12 @@ from shutil import rmtree
 
 from flask import Flask, request, render_template, flash, send_from_directory, redirect
 from mmif.serialize import Mmif
+from mmif.vocabulary import DocumentTypes
 
 import cache
 from cache import set_last_access, cleanup
 import traceback
-from render import render_documents, render_annotations, prepare_and_render_ocr, render_ocr_page
+from render import render_documents, render_annotations, prepare_ocr, render_ocr_page
 
 # these two static folder-related params are important, do not remove
 app = Flask(__name__, static_folder='static', static_url_path='')
@@ -26,9 +27,11 @@ def index():
 @app.route('/ocr', methods=['POST'])
 def ocr():
     if "page_number" not in request.json:
-        return serve_first_ocr_page(request.json)
-    else:
-        return serve_ocr_page(request.json)
+        build_ocr_tab(request.json)
+        request.json["page_number"] = 0
+    #     return serve_first_ocr_page(request.json)
+    # else:
+    return serve_ocr_page(request.json)
 
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -102,9 +105,9 @@ def render_mmif(mmif_str, viz_id):
                            annotations=rendered_annotations)
 
 
-def serve_first_ocr_page(data):
+def build_ocr_tab(data):
     """
-    Prepares OCR (at load time, due to lazy loading) and serves the first page
+    Prepares OCR (at load time, due to lazy loading)
     """
     try:
         data = dict(request.json)
@@ -112,7 +115,10 @@ def serve_first_ocr_page(data):
                         data["mmif_id"] / "file.mmif").read()
         mmif = Mmif(mmif_str)
         ocr_view = mmif.get_view_by_id(data["view_id"])
-        return prepare_and_render_ocr(mmif, ocr_view, data["mmif_id"])
+        prepare_ocr(mmif, ocr_view, data["mmif_id"])
+        request.json["vid_path"] = mmif.get_documents_by_type(DocumentTypes.VideoDocument)[
+                0].location_path()
+
     except Exception as e:
         app.logger.error(f"{e}\n{traceback.format_exc()}")
         return f'<p class="error">Error: {e} Check the server log for more information.</h1>'
