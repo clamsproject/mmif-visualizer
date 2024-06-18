@@ -1,7 +1,7 @@
 
 <div id="ocr_tab_{{view_id}}">
     {% for frame_num, frame in page %}
-        {% set filename = "/mmif-viz-cache/" + mmif_id + "/img/" + frame["id"] %}
+        {% set filename = "/mmif-viz-cache/" + mmif_id + "/img/" + view_id + "/" + frame["id"] %}
         {% set id = frame["id"] %}
         {% set boxes = frame["boxes"] %}
         {% set secs = frame["secs"] %}

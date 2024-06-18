@@ -236,7 +236,7 @@ def render_ocr_page(mmif_id, vid_path, view_id, page_number):
     thumbnail_pages = json.load(open(tn_data_fname))
     page = thumbnail_pages[str(page_number)]
     prev_frame_cap = None
-    path = make_image_directory(mmif_id)
+    path = make_image_directory(mmif_id, view_id)
     for frame_num, frame in page:
         # If index is range instead of frame...
         if frame.get("range"):

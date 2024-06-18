@@ -33,16 +33,21 @@ def get_abstract_view_type(view, mmif):
         return "NER"
     elif all([anno_type in annotation_types for anno_type in ["Token", "TimeFrame", "Alignment"]]):
         return "ASR"
+    ocr_apps = ["swt-detection", "doctr-wrapper", "pyscenedetect-wrapper", "easyocr-wrapper",
+                "slatedetection", "fewshotclassifier", "barsdetection", "east-textdetection",
+                "parseqocr-wrapper", "tesseractocr-wrapper", "chyron-detection", "paddleocr-wrapper"]
+    if any([app in view.metadata.app for app in ocr_apps]):
+        return "OCR"
     # Define an OCR view as one that refers to a video and doesn't contain Sentences
     # or Tokens
-    else:
-        for configuration in view.metadata.contains.values():
-            if "document" in configuration \
-                    and mmif.get_document_by_id(configuration["document"]).at_type.shortname == "VideoDocument":
-                if not any([anno_type in annotation_types for anno_type in ["Sentence", "Token"]]):
-                    return "OCR"
-
-
+    # else:
+    #     for configuration in view.metadata.contains.values():
+    #         if "document" in configuration \
+    #                 and mmif.get_document_by_id(configuration["document"]).at_type.shortname == "VideoDocument":
+    #             if not any([anno_type in annotation_types for anno_type in ["Sentence", "Token"]]):
+    #                 return "OCR"
+                
+                
 def get_vtt_file(view, viz_id):
     vtt_filename = cache.get_cache_root() / viz_id / \
         f"{view.id.replace(':', '-')}.vtt"

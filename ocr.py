@@ -193,9 +193,9 @@ def paginate(frames_list):
     return {i: page for (i, page) in enumerate(pages)}
 
 
-def make_image_directory(mmif_id):
+def make_image_directory(mmif_id, view_id):
     # Make path for temp OCR image files or clear image files if it exists
-    path = cache.get_cache_root() / mmif_id / "img"
+    path = cache.get_cache_root() / mmif_id / "img" / view_id
     if os.path.exists(path):
         shutil.rmtree(path)
     os.makedirs(path)
@@ -265,29 +265,6 @@ def round_boxes(boxes):
             rounded_box.append(round(coord / 100) * 100)
         rounded_boxes.append(rounded_box)
     return rounded_boxes
-
-
-def get_ocr_views(mmif):
-    """Returns all CV views, which contain timeframes or bounding boxes"""
-    views = []
-    required_types = ["TimeFrame", "BoundingBox", "TimePoint"]
-    for view in mmif.views:
-        for anno_type, anno in view.metadata.contains.items():
-            # Annotation belongs to a CV view if it is a TimeFrame/BB and it refers to a VideoDocument
-            # if anno.get("document") is None:
-            #     continue
-            # if anno_type.shortname in required_types and mmif.get_document_by_id(
-            #         anno["document"]).at_type.shortname == "VideoDocument":
-            #     views.append(view)
-            #     continue
-            if anno_type.shortname in required_types:
-                views.append(view)
-                break
-            # TODO: Couldn't find a simple way to show if an alignment view is a CV/Frames-type view
-            elif "parseq" in view.metadata.app:
-                views.append(view)
-                break
-    return views
 
 
 def save_json(data, view_id, mmif_id):
