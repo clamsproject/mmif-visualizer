@@ -129,8 +129,9 @@ class OCRFrame():
 
     def add_text_document(self, anno):
         t = anno.properties.get("text_value") or anno.text_value
-        text_val = re.sub(r'([\\\/\|\"\'])', r'\1 ', t)
-        self.text = self.text + [text_val] if text_val not in self.text else self.text
+        if t:
+            text_val = re.sub(r'([\\\/\|\"\'])', r'\1 ', t)
+            self.text = self.text + [text_val] if text_val not in self.text else self.text
 
 
 def get_ocr_frames(view, mmif):
