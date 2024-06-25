@@ -148,13 +148,7 @@ def upload_file(in_mmif):
         with open(path / 'file.mmif', 'w') as in_mmif_file:
             app.logger.debug(f"Writing original MMIF to {path / 'file.mmif'}")
             in_mmif_file.write(in_mmif_str)
-        mmif = Mmif(in_mmif_str)
-        htmlized_docs = utils.documents_to_htmls(mmif, viz_id)
-        app.logger.debug(f"Prepared document: {[d[0] for d in htmlized_docs]}")
-        annotations = utils.prep_annotations(mmif, viz_id)
-        app.logger.debug(f"Prepared Annotations: {[annotation[0] for annotation in annotations]}")
-        html_page = render_template('player.html',
-                               docs=htmlized_docs, viz_id=viz_id, annotations=annotations)
+        html_page = render_mmif(in_mmif_str, viz_id)
         with open(os.path.join(path, "index.html"), "w") as f:
             f.write(html_page)
     except FileExistsError:
@@ -164,7 +158,6 @@ def upload_file(in_mmif):
         t = Thread(target=cleanup)
         t.daemon = True
         t.run()
-
     agent = request.headers.get('User-Agent')
     if 'curl' in agent.lower():
         return f"Visualization ID is {viz_id}\nYou can access the visualized file at {request.url_root}display/{viz_id}\n"

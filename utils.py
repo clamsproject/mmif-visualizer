@@ -11,7 +11,7 @@ def url2posix(path):
     return path
 
 
-def get_status(view):
+def get_status(view): 
     return 'ERROR' if 'message' in view.metadata.error else 'OKAY'
 
 

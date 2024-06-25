@@ -5,6 +5,8 @@ import json
 import re
 import os
 import shutil
+from mmif.vocabulary.annotation_types import AnnotationTypes
+from mmif.vocabulary.document_types import DocumentTypes
 
 from mmif.utils.video_document_helper import convert_timepoint, convert_timeframe
 
@@ -54,9 +56,8 @@ class OCRFrame():
 
     def add_bounding_box(self, anno, mmif):
         if "timePoint" in anno.properties:
-            timepoint_anno = find_annotation(
-                anno.properties["timePoint"], mmif)
-
+            timepoint_anno = mmif[anno.get("timePoint")]
+            
             if timepoint_anno:
                 self.add_timepoint(timepoint_anno, mmif,
                                    skip_if_view_has_frames=False)
