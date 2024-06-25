@@ -148,7 +148,13 @@ def upload_file(in_mmif):
         with open(path / 'file.mmif', 'w') as in_mmif_file:
             app.logger.debug(f"Writing original MMIF to {path / 'file.mmif'}")
             in_mmif_file.write(in_mmif_str)
-        html_page = render_mmif(in_mmif_str, viz_id)
+        mmif = Mmif(in_mmif_str)
+        htmlized_docs = utils.documents_to_htmls(mmif, viz_id)
+        app.logger.debug(f"Prepared document: {[d[0] for d in htmlized_docs]}")
+        annotations = utils.prep_annotations(mmif, viz_id)
+        app.logger.debug(f"Prepared Annotations: {[annotation[0] for annotation in annotations]}")
+        html_page = render_template('player.html',
+                               docs=htmlized_docs, viz_id=viz_id, annotations=annotations)
         with open(os.path.join(path, "index.html"), "w") as f:
             f.write(html_page)
     except FileExistsError:

@@ -34,16 +34,16 @@ class OCRFrame():
 
     def update(self, anno, mmif):
 
-        if anno.at_type.shortname == "BoundingBox":
+        if anno.at_type == AnnotationTypes.BoundingBox:
             self.add_bounding_box(anno, mmif)
 
-        elif anno.at_type.shortname == "TimeFrame":
+        elif anno.at_type == AnnotationTypes.TimeFrame:
             self.add_timeframe(anno, mmif)
 
-        elif anno.at_type.shortname == "TimePoint":
+        elif anno.at_type == AnnotationTypes.TimePoint:
             self.add_timepoint(anno, mmif)
 
-        elif anno.at_type.shortname == "TextDocument":
+        elif anno.at_type == DocumentTypes.TextDocument:
             self.add_text_document(anno)
 
         elif anno.at_type.shortname == "Paragraph":
@@ -61,19 +61,26 @@ class OCRFrame():
                 self.add_timepoint(timepoint_anno, mmif,
                                    skip_if_view_has_frames=False)
         else:
-            self.frame_num = convert_timepoint(mmif, anno, "frames")
-            self.secs = convert_timepoint(mmif, anno, "seconds")
-        box_id = anno.properties["id"]
-        boxType = anno.properties["boxType"]
-        coordinates = anno.properties["coordinates"]
+            for alignment_anns in mmif.get_alignments(AnnotationTypes.BoundingBox, AnnotationTypes.TimePoint).values():
+                for alignment_ann in alignment_anns:
+                    if alignment_ann.get('source') == anno.id:
+                        timepoint_anno = mmif[alignment_ann.get('target')]
+                        break
+                    elif alignment_ann.get('target') == anno.id:
+                        timepoint_anno = mmif[alignment_ann.get('source')]
+                        break
+        if timepoint_anno:
+            self.add_timepoint(timepoint_anno, mmif, skip_if_view_has_frames=False)
+
+        box_id = anno.get("id")
+        boxType = anno.get("boxType")
+        coordinates = anno.get("coordinates")
         x = coordinates[0][0]
         y = coordinates[0][1]
         w = coordinates[1][0] - x
         h = coordinates[1][1] - y
         box = [box_id, boxType, [x, y, w, h]]
-        # TODO: This is a hack to ignore percentage-based Doctr bounding boxes
-        if "doctr" not in mmif.get_view_by_id(anno.parent).metadata["app"]:
-            self.boxes.append(box)
+        self.boxes.append(box)
         self.anno_ids.append(box_id)
         self.timestamp = str(datetime.timedelta(seconds=self.secs))
         if anno.properties.get("boxType") and anno.properties.get("boxType") not in self.boxtypes:
@@ -142,26 +149,16 @@ def prepare_ocr(mmif, view, viz_id):
     save_json(frames_pages, view.id, viz_id)
 
 
-def find_annotation(anno_id, mmif):
-    if mmif.id_delimiter in anno_id:
-        view_id, anno_id = anno_id.split(mmif.id_delimiter)
-        view = mmif.get_view_by_id(view_id)
-    for view in mmif.views:
-        try:
-            return view.get_annotation_by_id(anno_id)
-        except KeyError:
-            continue
-
 
 def get_ocr_frames(view, mmif):
     frames = {}
     full_alignment_type = [
-        at_type for at_type in view.metadata.contains if at_type.shortname == "Alignment"]
+        at_type for at_type in view.metadata.contains if at_type == AnnotationTypes.Alignment]
     # If view contains alignments
     if full_alignment_type:
         for alignment in view.get_annotations(full_alignment_type[0]):
-            source = find_annotation(alignment.properties["source"], mmif)
-            target = find_annotation(alignment.properties["target"], mmif)
+            source = mmif[alignment.get("source")]
+            target = mmif[alignment.get("target")]
 
             # Account for alignment in either direction
             frame = OCRFrame(source, mmif)

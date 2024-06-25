@@ -1,3 +1,4 @@
+import logging
 import os
 import pathlib
 import shutil
@@ -16,7 +17,7 @@ def get_cache_root():
     return pathlib.Path(_CACHE_DIR_ROOT.name)
 
 
-def invalidate_cache(viz_ids):
+def invalidate_cache(viz_ids=[]):
     if not viz_ids:
         shutil.rmtree(get_cache_root())
         os.makedirs(get_cache_root())
@@ -55,11 +56,11 @@ def scan_tmp_directory():
 
 def cleanup():
     with lock:
-        print("Checking visualization cache...")
+        logging.info("Checking visualization cache...")
         # Max tmp size is 500MB
         max_size = 500000000
         folder_size, oldest_dir = scan_tmp_directory()
         while folder_size > max_size:
-            print(f"Maximum cache size reached. Deleting {os.path.basename(oldest_dir)}.")
+            logging.info(f"Maximum cache size reached. Deleting {os.path.basename(oldest_dir)}.")
             shutil.rmtree(oldest_dir)
             folder_size, oldest_dir = scan_tmp_directory()
