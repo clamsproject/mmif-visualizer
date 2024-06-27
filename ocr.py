@@ -1,14 +1,13 @@
 import datetime
-import pathlib
 
 import cv2
-import tempfile
 import json
 import re
-import os, shutil
+import os
+import shutil
+from mmif.vocabulary.annotation_types import AnnotationTypes
+from mmif.vocabulary.document_types import DocumentTypes
 
-from flask import render_template
-from mmif import AnnotationTypes, DocumentTypes, Mmif
 from mmif.utils.video_document_helper import convert_timepoint, convert_timeframe
 
 import cache
@@ -58,14 +57,17 @@ class OCRFrame():
 
         elif anno.at_type.shortname == "Paragraph":
             view = mmif.get_view_by_id(anno.parent)
-            text_anno = mmif[anno.properties.get("document")]
+            text_anno = view.get_annotation_by_id(
+                anno.properties.get("document"))
             self.add_text_document(text_anno)
 
-    def add_bounding_box(self, anno, mmif: Mmif):
-        timepoint_anno = None
+    def add_bounding_box(self, anno, mmif):
         if "timePoint" in anno.properties:
             timepoint_anno = mmif[anno.get("timePoint")]
-
+            
+            if timepoint_anno:
+                self.add_timepoint(timepoint_anno, mmif,
+                                   skip_if_view_has_frames=False)
         else:
             for alignment_anns in mmif.get_alignments(AnnotationTypes.BoundingBox, AnnotationTypes.TimePoint).values():
                 for alignment_ann in alignment_anns:
@@ -95,7 +97,8 @@ class OCRFrame():
     def add_timeframe(self, anno, mmif):
         # If annotation has multiple targets, pick the first and last as start and end
         if "targets" in anno.properties:
-            start_id, end_id = anno.properties.get("targets")[0], anno.properties.get("targets")[-1]
+            start_id, end_id = anno.properties.get(
+                "targets")[0], anno.properties.get("targets")[-1]
             anno_parent = mmif.get_view_by_id(anno.parent)
             start_anno, end_anno = anno_parent.get_annotation_by_id(start_id), anno_parent.get_annotation_by_id(end_id)
             start = convert_timepoint(mmif, start_anno, "frames")
@@ -106,7 +109,8 @@ class OCRFrame():
             start, end = convert_timeframe(mmif, anno, "frames")
             start_secs, end_secs = convert_timeframe(mmif, anno, "seconds")
         self.range = (start, end)
-        self.timestamp_range = (str(datetime.timedelta(seconds=start_secs)), str(datetime.timedelta(seconds=end_secs)))
+        self.timestamp_range = (str(datetime.timedelta(seconds=start_secs)), str(
+            datetime.timedelta(seconds=end_secs)))
         self.sec_range = (start_secs, end_secs)
         if anno.properties.get("frameType"):
             self.frametype = str(anno.properties.get("frameType"))
@@ -114,24 +118,43 @@ class OCRFrame():
             self.frametype = str(anno.properties.get("label"))
 
     def add_timepoint(self, anno, mmif, skip_if_view_has_frames=True):
-            parent = mmif.get_view_by_id(anno.parent)
-            other_annotations = [k for k in parent.metadata.contains.keys() if k != anno.id]
-            # If there are TimeFrames in the same view, they most likely represent
-            # condensed information about representative frames (e.g. SWT). In this 
-            # case, only render the TimeFrames and ignore the TimePoints.
-            if any([anno == AnnotationTypes.TimeFrame for anno in other_annotations]) and skip_if_view_has_frames:
-                return
-            self.frame_num = convert_timepoint(mmif, anno, "frames")
-            self.secs = convert_timepoint(mmif, anno, "seconds")
-            self.timestamp = str(datetime.timedelta(seconds=self.secs))
-            if anno.properties.get("label"):
-                self.frametype = anno.properties.get("label")
+        parent = mmif.get_view_by_id(anno.parent)
+        other_annotations = [
+            k for k in parent.metadata.contains.keys() if k != anno.id]
+        # If there are TimeFrames in the same view, they most likely represent
+        # condensed information about representative frames (e.g. SWT). In this
+        # case, only render the TimeFrames and ignore the TimePoints.
+        if any([anno.shortname == "TimeFrame" for anno in other_annotations]) and skip_if_view_has_frames:
+            return
+        self.frame_num = convert_timepoint(mmif, anno, "frames")
+        self.secs = convert_timepoint(mmif, anno, "seconds")
+        self.timestamp = str(datetime.timedelta(seconds=self.secs))
+        if anno.properties.get("label"):
+            self.frametype = anno.properties.get("label")
 
     def add_text_document(self, anno):
-        t = anno.properties.get("text_value") or anno.text_value
+        t = anno.properties.get(
+            "text_value") or anno.properties.get("text").value
         if t:
             text_val = re.sub(r'([\\\/\|\"\'])', r'\1 ', t)
-            self.text = self.text + [text_val] if text_val not in self.text else self.text
+            self.text = self.text + \
+                [text_val] if text_val not in self.text else self.text
+
+
+def prepare_ocr(mmif, view, viz_id):
+    """
+    Prepares list of frames that will be passed back and forth between server
+    and client, and renders the first page of the OCR.
+    """
+    ocr_frames = get_ocr_frames(view, mmif)
+
+    # Generate pages (necessary to reduce IO cost) and render
+    frames_list = [(k, vars(v)) for k, v in ocr_frames.items()]
+    frames_list = find_duplicates(frames_list)
+    frames_pages = paginate(frames_list)
+    # Save page list as temp file
+    save_json(frames_pages, view.id, viz_id)
+
 
 
 def get_ocr_frames(view, mmif):
@@ -158,7 +181,7 @@ def get_ocr_frames(view, mmif):
                 frames[i].update(target, mmif)
             else:
                 frames[i] = frame
-            
+
     else:
         for annotation in view.get_annotations():
             frame = OCRFrame(annotation, mmif)
@@ -169,7 +192,6 @@ def get_ocr_frames(view, mmif):
                 frames[i].update(annotation, mmif)
             else:
                 frames[i] = frame
-    print(frames)
     return frames
 
 
@@ -192,45 +214,9 @@ def paginate(frames_list):
     return {i: page for (i, page) in enumerate(pages)}
 
 
-def render_ocr(mmif_id, vid_path, view_id, page_number):
-    """
-    Iterate through frames and display the contents/alignments.
-    """
-    # Path for storing temporary images generated by cv2
-    cv2_vid = cv2.VideoCapture(vid_path)
-    tn_data_fname = cache.get_cache_root() / mmif_id / f"{view_id}-pages.json"
-    thumbnail_pages = json.load(open(tn_data_fname))
-    page = thumbnail_pages[str(page_number)]
-    prev_frame_cap = None
-    path = make_image_directory(mmif_id)
-    for frame_num, frame in page:
-        # If index is range instead of frame...
-        if frame.get("range"):
-            frame_num = (int(frame["range"][0]) + int(frame["range"][1])) / 2
-        cv2_vid.set(1, frame_num)
-        _, frame_cap = cv2_vid.read()
-        if frame_cap is None:
-            raise FileNotFoundError(f"Video file {vid_path} not found!")
-
-        # Double check histogram similarity of "repeat" frames -- if they're significantly different, un-mark as repeat
-        if prev_frame_cap is not None and frame["repeat"] and not is_duplicate_image(prev_frame_cap, frame_cap,
-                                                                                     cv2_vid):
-            frame["repeat"] = False
-        with tempfile.NamedTemporaryFile(dir=str(path), suffix=".jpg", delete=False) as tf:
-            cv2.imwrite(tf.name, frame_cap)
-            # "id" is just the name of the temp image file
-            frame["id"] = pathlib.Path(tf.name).name
-        prev_frame_cap = frame_cap
-
-    tn_page_html = render_template(
-        'ocr.html', vid_path=vid_path, view_id=view_id, page=page,
-        n_pages=len(thumbnail_pages), page_number=str(page_number), mmif_id=mmif_id)
-    return tn_page_html
-
-
-def make_image_directory(mmif_id):
+def make_image_directory(mmif_id, view_id):
     # Make path for temp OCR image files or clear image files if it exists
-    path = cache.get_cache_root() / mmif_id / "img"
+    path = cache.get_cache_root() / mmif_id / "img" / view_id
     if os.path.exists(path):
         shutil.rmtree(path)
     os.makedirs(path)
@@ -275,10 +261,14 @@ def is_duplicate_image(prev_frame, frame, cv2_vid):
     img2_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
     # Calculate the histogram and normalize it
-    hist_img1 = cv2.calcHist([img1_hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
-    cv2.normalize(hist_img1, hist_img1, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX);
-    hist_img2 = cv2.calcHist([img2_hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
-    cv2.normalize(hist_img2, hist_img2, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX);
+    hist_img1 = cv2.calcHist([img1_hsv], [0, 1], None, [
+                             180, 256], [0, 180, 0, 256])
+    cv2.normalize(hist_img1, hist_img1, alpha=0,
+                  beta=1, norm_type=cv2.NORM_MINMAX)
+    hist_img2 = cv2.calcHist([img2_hsv], [0, 1], None, [
+                             180, 256], [0, 180, 0, 256])
+    cv2.normalize(hist_img2, hist_img2, alpha=0,
+                  beta=1, norm_type=cv2.NORM_MINMAX)
 
     # Find the metric value
     metric_val = cv2.compareHist(hist_img1, hist_img2, cv2.HISTCMP_CHISQR)
@@ -296,29 +286,6 @@ def round_boxes(boxes):
             rounded_box.append(round(coord / 100) * 100)
         rounded_boxes.append(rounded_box)
     return rounded_boxes
-
-
-def get_ocr_views(mmif):
-    """Returns all CV views, which contain timeframes or bounding boxes"""
-    views = []
-    required_types = ["TimeFrame", "BoundingBox", "TimePoint"]
-    for view in mmif.views:
-        for anno_type, anno in view.metadata.contains.items():
-            # Annotation belongs to a CV view if it is a TimeFrame/BB and it refers to a VideoDocument
-            # if anno.get("document") is None:
-            #     continue
-            # if anno_type.shortname in required_types and mmif.get_document_by_id(
-            #         anno["document"]).at_type.shortname == "VideoDocument":
-            #     views.append(view)
-            #     continue
-            if anno_type.shortname in required_types:
-                views.append(view)
-                break
-            # TODO: Couldn't find a simple way to show if an alignment view is a CV/Frames-type view
-            elif "parseq" in view.metadata.app:
-                views.append(view)
-                break
-    return views
 
 
 def save_json(data, view_id, mmif_id):

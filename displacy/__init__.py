@@ -48,11 +48,11 @@ def read_text(textdoc, app_root):
         # container, see the comment in html_text() in ../app.py)
         if not os.path.isfile(location):
             if location.startswith('file:///'):
-                location = location[8:]
+                location = location[7:]
             else:
                 # this should not happen anymore, but keeping it anyway
                 location = location[1:]
-            location = os.path.join(app_root, 'static', location)
+            # location = os.path.join(app_root, 'static', location)
         with open(location) as fh:
             text = fh.read()
     else:

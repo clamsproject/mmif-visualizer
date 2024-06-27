@@ -1,7 +1,7 @@
 
 <div id="ocr_tab_{{view_id}}">
     {% for frame_num, frame in page %}
-        {% set filename = "/mmif-viz-cache/" + mmif_id + "/img/" + frame["id"] %}
+        {% set filename = "/mmif-viz-cache/" + mmif_id + "/img/" + view_id + "/" + frame["id"] %}
         {% set id = frame["id"] %}
         {% set boxes = frame["boxes"] %}
         {% set secs = frame["secs"] %}
@@ -142,7 +142,7 @@ function changePage(page) {
         if (data["page_number"] >= 0 && data["page_number"] < parseInt("{{n_pages}}")) {
             $.ajax({
             type:'POST',
-            url:'/ocrpage',
+            url:'/ocr',
             contentType: "application/json",
             data: JSON.stringify(data),
             success: function(res_html){

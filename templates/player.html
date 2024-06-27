@@ -117,27 +117,27 @@
         <ul class="nav nav-tabs">
           <!-- printing the first one out of the loop so it can be made the active link -->
           <li class="nav-item">
-            <a class="nav-link active" data-toggle="tab" href="#{{ docs[0][0] }}">{{ docs[0][0] }}</a>
+            <a class="nav-link active" data-toggle="tab" href="#{{ docs[0]['tab_name'] }}">{{ docs[0]['tab_name'] }}</a>
           </li>
           {% for medium in docs[1:] %}
-          <li class="nav-item {{medium[0]}}">
-            <a class="nav-link" data-toggle="tab" href="#{{ medium[0] }}">{{ medium[0] }}</a>
+          <li class="nav-item {{medium['tab_name']}}">
+            <a class="nav-link" data-toggle="tab" href="#{{ medium['tab_name'] }}">{{ medium['tab_name'] }}</a>
           </li>
           {%  endfor %}
         </ul>
 
         <!-- contents of the documents -->
         <div class="tab-content">
-          <div id="{{ docs[0][0] }}" class="tab-pane fade show active">
+          <div id="{{ docs[0]['tab_name'] }}" class="tab-pane fade show active">
             <br/>
-            <p>{{ docs[0][2] }}</p>
-            {{ docs[0][3] | safe }}
+            <!-- <p>{{ docs[0][2] }}</p> -->
+            {{ docs[0]['html'] | safe }}
           </div>
           {% for medium in docs[1:] %}
-          <div id="{{ medium[0] }}" class="tab-pane fade">
+          <div id="{{ medium['tab_name'] }}" class="tab-pane fade">
             <br/>
-            <p>{{ medium[2] }}</p>
-            {{ medium[3] | safe }}
+            <!-- <p>{{ medium[2] }}</p> -->
+            {{ medium['html'] | safe }}
           </div>
           {% endfor %}
         </div>
@@ -148,8 +148,8 @@
         <!-- navigation tabs for the visualizations (WebVTT, Entities, etcetera) -->
         <ul class="nav nav-tabs">
           {% for annotation in annotations %}
-          <li class="nav-item {{ annotation[0] }}">
-            <a class="nav-link" data-toggle="tab" href="#{{ annotation[0] }}">{{ annotation[0] }}</a>
+          <li class="nav-item {{ annotation['tab_name'] }}">
+            <a class="nav-link" data-toggle="tab" href="#{{ annotation['tab_name'] }}">{{ annotation['tab_name'] }}</a>
           </li>
           {%  endfor %}
         </ul>
@@ -157,9 +157,9 @@
         <!-- visualization content -->
         <div class="tab-content">
           {% for annotation in annotations %}
-          <div id="{{ annotation[0] }}" class="tab-pane fade">
+          <div id="{{ annotation['tab_name'] }}" class="tab-pane fade">
             <br/>
-            {{ annotation[1] | safe }}
+            {{ annotation['html'] | safe }}
           </div>
           {% endfor %}
         </div>
