@@ -12,6 +12,13 @@ from mmif.utils.video_document_helper import convert_timepoint, convert_timefram
 
 import cache
 
+"""
+Helper function for showing debug information
+
+def some_function(x):
+    from utils import app  # import inside function
+    app.logger.debug(x)
+"""
 
 class OCRFrame():
     """
@@ -64,10 +71,10 @@ class OCRFrame():
         else:
             for alignment_anns in mmif.get_alignments(AnnotationTypes.BoundingBox, AnnotationTypes.TimePoint).values():
                 for alignment_ann in alignment_anns:
-                    if alignment_ann.get('source') == anno.id:
+                    if alignment_ann.get('source') == anno.long_id:
                         timepoint_anno = mmif[alignment_ann.get('target')]
                         break
-                    elif alignment_ann.get('target') == anno.id:
+                    elif alignment_ann.get('target') == anno.long_id:
                         timepoint_anno = mmif[alignment_ann.get('source')]
                         break
         if timepoint_anno:
@@ -93,8 +100,7 @@ class OCRFrame():
             start_id, end_id = anno.properties.get(
                 "targets")[0], anno.properties.get("targets")[-1]
             anno_parent = mmif.get_view_by_id(anno.parent)
-            start_anno, end_anno = anno_parent.get_annotation_by_id(
-                start_id), anno_parent.get_annotation_by_id(end_id)
+            start_anno, end_anno = anno_parent.get_annotation_by_id(start_id), anno_parent.get_annotation_by_id(end_id)
             start = convert_timepoint(mmif, start_anno, "frames")
             end = convert_timepoint(mmif, end_anno, "frames")
             start_secs = convert_timepoint(mmif, start_anno, "seconds")
@@ -163,6 +169,8 @@ def get_ocr_frames(view, mmif):
 
             # Account for alignment in either direction
             frame = OCRFrame(source, mmif)
+            if target.at_type == DocumentTypes.TextDocument:
+                frame.add_timepoint(source, mmif, skip_if_view_has_frames=False)
             frame.update(target, mmif)
 
             i = frame.frame_num if frame.frame_num is not None else frame.range
