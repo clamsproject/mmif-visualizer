@@ -3,16 +3,20 @@ import os
 import secrets
 import sys
 from threading import Thread
+from shutil import rmtree
 
-from flask import request, render_template, flash, send_from_directory, redirect
+from flask import Flask, request, render_template, flash, send_from_directory, redirect
 from mmif.serialize import Mmif
+from mmif.vocabulary import DocumentTypes
 
 import cache
 from cache import set_last_access, cleanup
-from utils import app, render_ocr, documents_to_htmls, prep_annotations, prepare_ocr_visualization
 import traceback
-import utils
-from utils import app
+from render import render_documents, render_annotations, prepare_ocr, render_ocr_page
+
+# these two static folder-related params are important, do not remove
+app = Flask(__name__, static_folder='static', static_url_path='')
+app.secret_key = 'your_secret_key_here'
 
 
 @app.route('/')
@@ -22,24 +26,12 @@ def index():
 
 @app.route('/ocr', methods=['POST'])
 def ocr():
-    try:
-        data = dict(request.json)
-        mmif_str = open(cache.get_cache_root() / data["mmif_id"] / "file.mmif").read()
-        mmif = Mmif(mmif_str)
-        ocr_view = mmif.get_view_by_id(data["view_id"])
-        return utils.prepare_ocr_visualization(mmif, ocr_view, data["mmif_id"])
-    except Exception as e:
-        app.logger.error(f"{e}\n{traceback.format_exc()}")
-        return f'<p class="error">Error: {e} Check the server log for more information.</h1>'
-
-
-@app.route('/ocrpage', methods=['POST'])
-def ocrpage():
-    data = request.json
-    try:
-        return utils.render_ocr(data["mmif_id"], data['vid_path'], data["view_id"], data["page_number"])
-    except Exception as e:
-        return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
+    if "page_number" not in request.json:
+        build_ocr_tab(request.json)
+        request.json["page_number"] = 0
+    #     return serve_first_ocr_page(request.json)
+    # else:
+    return serve_ocr_page(request.json)
 
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -93,7 +85,7 @@ def display(viz_id):
         return html_file
     else:
         app.logger.debug(f"Visualization {viz_id} not found in cache.")
-        os.remove(path)
+        rmtree(path)
         flash("File not found -- please upload again (it may have been deleted to clear up cache space).")
         return redirect("/upload")
 
@@ -101,6 +93,45 @@ def display(viz_id):
 @app.route('/uv/<path:path>')
 def send_js(path):
     return send_from_directory("uv", path)
+
+
+def render_mmif(mmif_str, viz_id):
+    mmif = Mmif(mmif_str)
+    rendered_documents = render_documents(mmif, viz_id)
+    rendered_annotations = render_annotations(mmif, viz_id)
+    return render_template('player.html',
+                           docs=rendered_documents,
+                           viz_id=viz_id,
+                           annotations=rendered_annotations)
+
+
+def build_ocr_tab(data):
+    """
+    Prepares OCR (at load time, due to lazy loading)
+    """
+    try:
+        data = dict(request.json)
+        mmif_str = open(cache.get_cache_root() /
+                        data["mmif_id"] / "file.mmif").read()
+        mmif = Mmif(mmif_str)
+        ocr_view = mmif.get_view_by_id(data["view_id"])
+        prepare_ocr(mmif, ocr_view, data["mmif_id"])
+        request.json["vid_path"] = mmif.get_documents_by_type(DocumentTypes.VideoDocument)[
+                0].location_path()
+
+    except Exception as e:
+        app.logger.error(f"{e}\n{traceback.format_exc()}")
+        return f'<p class="error">Error: {e} Check the server log for more information.</h1>'
+
+
+def serve_ocr_page(data):
+    """
+    Serves subsequent OCR pages
+    """
+    try:
+        return render_ocr_page(data["mmif_id"], data['vid_path'], data["view_id"], data["page_number"])
+    except Exception as e:
+        return f'<p class="error">Unexpected error of type {type(e)}: {e}</h1>'
 
 
 def upload_file(in_mmif):
@@ -117,13 +148,7 @@ def upload_file(in_mmif):
         with open(path / 'file.mmif', 'w') as in_mmif_file:
             app.logger.debug(f"Writing original MMIF to {path / 'file.mmif'}")
             in_mmif_file.write(in_mmif_str)
-        mmif = Mmif(in_mmif_str)
-        htmlized_docs = utils.documents_to_htmls(mmif, viz_id)
-        app.logger.debug(f"Prepared document: {[d[0] for d in htmlized_docs]}")
-        annotations = utils.prep_annotations(mmif, viz_id)
-        app.logger.debug(f"Prepared Annotations: {[annotation[0] for annotation in annotations]}")
-        html_page = render_template('player.html',
-                               docs=htmlized_docs, viz_id=viz_id, annotations=annotations)
+        html_page = render_mmif(in_mmif_str, viz_id)
         with open(os.path.join(path, "index.html"), "w") as f:
             f.write(html_page)
     except FileExistsError:
@@ -133,7 +158,6 @@ def upload_file(in_mmif):
         t = Thread(target=cleanup)
         t.daemon = True
         t.run()
-
     agent = request.headers.get('User-Agent')
     if 'curl' in agent.lower():
         return f"Visualization ID is {viz_id}\nYou can access the visualized file at {request.url_root}display/{viz_id}\n"
@@ -143,7 +167,8 @@ def upload_file(in_mmif):
 if __name__ == '__main__':
     # Make path for temp files
     cache_path = cache.get_cache_root()
-    cache_symlink_path = os.path.join(app.static_folder, cache._CACHE_DIR_SUFFIX)
+    cache_symlink_path = os.path.join(
+        app.static_folder, cache._CACHE_DIR_SUFFIX)
     if os.path.islink(cache_symlink_path):
         os.unlink(cache_symlink_path)
     elif os.path.exists(cache_symlink_path):
@@ -158,5 +183,5 @@ if __name__ == '__main__':
     port = 5000
     if len(sys.argv) > 2 and sys.argv[1] == '-p':
         port = int(sys.argv[2])
-        
+
     app.run(port=port, host='0.0.0.0', debug=True, use_reloader=True)
