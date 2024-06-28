@@ -15,6 +15,7 @@ from ocr import prepare_ocr, make_image_directory, is_duplicate_image
 import cv2
 import json
 import tempfile
+from urllib import parse
 
 import cache
 
@@ -101,11 +102,12 @@ class AnnotationTab():
         # a specific view, we set the ids/tab names based on view properties.
         if view:
             self.view = view
-            # Workaround to deal with the fact that some apps have a version number
-            # in the URL
-            app_url = view.metadata.app if re.search(
-                r"\/v\d+\.?\d?$", view.metadata.app) else view.metadata.app + "/v1"
-            app_shortname = app_url.split("/")[-2]
+            if "apps.clams.ai" in view.metadata.app:
+                app_shortname = view.metadata.app.split("http://apps.clams.ai/")[1] \
+                                                 .split("/")[0]
+            else:
+                app_shortname = view.metadata.app
+            app_shortname = parse.quote(app_shortname).replace(".", "")
 
             self.id = view.id
             self.tab_name = f"{app_shortname}-{view.id}"
