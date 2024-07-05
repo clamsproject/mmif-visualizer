@@ -1,6 +1,7 @@
 from mmif.serialize.annotation import Text
 from flask import current_app
 import cache
+import mmif_docloc_baapb
 
 
 def url2posix(path):
@@ -8,6 +9,8 @@ def url2posix(path):
     the protocol if there is one."""
     if str(path).startswith('file:///'):
         path = path[7:]
+    elif str(path).startswith('baapb://'):
+        path = mmif_docloc_baapb.resolve(path)
     return path
 
 
